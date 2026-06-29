@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 780" font-family="Consolas, monospace">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 720" font-family="Consolas, monospace">
   <defs>
     <style>
       .wire-i2c  { stroke: #2196F3; stroke-width: 2.5; fill: none; }
@@ -7,7 +7,7 @@
       .wire-gpio { stroke: #FF9800; stroke-width: 2.5; fill: none; }
       .wire-pwr  { stroke: #F44336; stroke-width: 2; fill: none; stroke-dasharray: 8,4; }
       .wire-gnd  { stroke: #333; stroke-width: 2; fill: none; stroke-dasharray: 4,4; }
-      .wire-btn  { stroke: #9C27B0; stroke-width: 2.5; fill: none; }
+      .label     { font-size: 11px; fill: #333; }
       .pin-label { font-size: 10px; fill: #555; }
       .comp-name { font-size: 14px; font-weight: bold; fill: #1a1a1a; }
       .comp-desc { font-size: 10px; fill: #666; }
@@ -31,25 +31,33 @@
       <stop offset="0%" stop-color="#FCE4EC"/>
       <stop offset="100%" stop-color="#F8BBD0"/>
     </linearGradient>
-    <linearGradient id="btnGrad" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#F3E5F5"/>
-      <stop offset="100%" stop-color="#E1BEE7"/>
+    <linearGradient id="flashGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#E8EAF6"/>
+      <stop offset="100%" stop-color="#C5CAE9"/>
     </linearGradient>
     <marker id="dot" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6">
       <circle cx="5" cy="5" r="4" fill="#333"/>
     </marker>
   </defs>
 
-  <rect width="900" height="780" fill="#FAFAFA" rx="8"/>
+  <!-- Background -->
+  <rect width="900" height="720" fill="#FAFAFA" rx="8"/>
 
+  <!-- Title -->
   <text x="450" y="38" text-anchor="middle" class="title">🏠 Home Temperature Monitor — Wiring Diagram</text>
-  <text x="450" y="58" text-anchor="middle" class="subtitle">XIAO ESP32C6 + SHT40 + 2.9" E-Paper + DS3231 + Button (내장 플래시)</text>
+  <text x="450" y="58" text-anchor="middle" class="subtitle">XIAO ESP32C6 + SHT40 + 2.9" E-Paper + DS3231 (내장 플래시 LittleFS)</text>
 
-  <!-- ═══ XIAO ESP32C6 ═══ -->
+  <!-- ════════════════════════════════════════════════ -->
+  <!-- XIAO ESP32C6 (Center)                          -->
+  <!-- ════════════════════════════════════════════════ -->
   <rect x="320" y="160" width="220" height="440" rx="10" fill="url(#mcuGrad)" stroke="#1565C0" stroke-width="2"/>
   <text x="430" y="188" text-anchor="middle" class="comp-name">XIAO ESP32C6</text>
   <text x="430" y="204" text-anchor="middle" class="comp-desc">ESP32-C6 · 160MHz · WiFi6</text>
   <text x="430" y="218" text-anchor="middle" class="comp-desc">4MB Flash (LittleFS 저장)</text>
+
+  <!-- Internal Flash indicator -->
+  <rect x="340" y="230" width="180" height="30" rx="5" fill="url(#flashGrad)" stroke="#3949AB" stroke-width="1.5" stroke-dasharray="4,2"/>
+  <text x="430" y="250" text-anchor="middle" font-size="10" fill="#283593">💾 내장 4MB Flash (LittleFS)</text>
 
   <!-- Left pins -->
   <rect x="320" y="280" width="6" height="14" rx="2" fill="#FF9800"/>
@@ -70,8 +78,8 @@
   <rect x="320" y="440" width="6" height="14" rx="2" fill="#2196F3"/>
   <text x="332" y="451" class="pin-label">D5  GPIO23 SCL</text>
 
-  <rect x="320" y="480" width="6" height="14" rx="2" fill="#9C27B0"/>
-  <text x="332" y="491" class="pin-label">D6  GPIO16 BUTTON</text>
+  <rect x="320" y="480" width="6" height="14" rx="2" fill="#999"/>
+  <text x="332" y="491" class="pin-label">D6  GPIO16 (unused)</text>
 
   <rect x="320" y="510" width="6" height="14" rx="2" fill="#999"/>
   <text x="332" y="521" class="pin-label">D7  GPIO17 (unused)</text>
@@ -98,135 +106,174 @@
   <rect x="534" y="510" width="6" height="14" rx="2" fill="#F44336"/>
   <text x="528" y="521" text-anchor="end" class="pin-label">BAT 3.7V</text>
 
-  <!-- ═══ 2.9" E-Paper ═══ -->
+  <!-- ════════════════════════════════════════════════ -->
+  <!-- 2.9" E-Paper (Left)                            -->
+  <!-- ════════════════════════════════════════════════ -->
   <rect x="30" y="160" width="200" height="300" rx="10" fill="url(#spiGrad)" stroke="#E65100" stroke-width="2"/>
   <text x="130" y="188" text-anchor="middle" class="comp-name">2.9" E-Paper</text>
   <text x="130" y="204" text-anchor="middle" class="comp-desc">BWR · SSD1680 · 128×296</text>
+  <text x="130" y="220" text-anchor="middle" class="comp-desc">WeAct Studio</text>
 
   <rect x="224" y="280" width="6" height="14" rx="2" fill="#FF9800"/>
   <text x="218" y="291" text-anchor="end" class="pin-label">BUSY</text>
+
   <rect x="224" y="310" width="6" height="14" rx="2" fill="#FF9800"/>
   <text x="218" y="321" text-anchor="end" class="pin-label">DC</text>
+
   <rect x="224" y="340" width="6" height="14" rx="2" fill="#FF9800"/>
   <text x="218" y="351" text-anchor="end" class="pin-label">RST</text>
+
   <rect x="224" y="370" width="6" height="14" rx="2" fill="#FF9800"/>
   <text x="218" y="381" text-anchor="end" class="pin-label">CS</text>
+
   <rect x="224" y="410" width="6" height="14" rx="2" fill="#4CAF50"/>
   <text x="218" y="421" text-anchor="end" class="pin-label">CLK (SCK)</text>
+
   <rect x="224" y="440" width="6" height="14" rx="2" fill="#4CAF50"/>
   <text x="218" y="451" text-anchor="end" class="pin-label">DIN (MOSI)</text>
+
   <rect x="224" y="470" width="6" height="14" rx="2" fill="#F44336"/>
   <text x="218" y="481" text-anchor="end" class="pin-label">VCC</text>
+
   <rect x="224" y="490" width="6" height="14" rx="2" fill="#333"/>
   <text x="218" y="501" text-anchor="end" class="pin-label">GND</text>
 
-  <!-- ═══ SHT40 ═══ -->
+  <!-- ════════════════════════════════════════════════ -->
+  <!-- SHT40 (Right-Top)                              -->
+  <!-- ════════════════════════════════════════════════ -->
   <rect x="660" y="160" width="200" height="180" rx="10" fill="url(#i2cGrad)" stroke="#2E7D32" stroke-width="2"/>
   <text x="760" y="188" text-anchor="middle" class="comp-name">SHT40</text>
-  <text x="760" y="204" text-anchor="middle" class="comp-desc">I2C · ±0.2°C · Addr: 0x44</text>
+  <text x="760" y="204" text-anchor="middle" class="comp-desc">I2C · ±0.2°C · ±1.8%RH</text>
+  <text x="760" y="220" text-anchor="middle" class="comp-desc">Addr: 0x44</text>
 
   <rect x="654" y="280" width="6" height="14" rx="2" fill="#2196F3"/>
   <text x="662" y="291" class="pin-label">SDA</text>
+
   <rect x="654" y="310" width="6" height="14" rx="2" fill="#2196F3"/>
   <text x="662" y="321" class="pin-label">SCL</text>
+
   <rect x="654" y="350" width="6" height="14" rx="2" fill="#F44336"/>
   <text x="662" y="361" class="pin-label">VCC / GND</text>
 
-  <!-- ═══ DS3231 ═══ -->
+  <!-- ════════════════════════════════════════════════ -->
+  <!-- DS3231 RTC (Right-Bottom)                      -->
+  <!-- ════════════════════════════════════════════════ -->
   <rect x="660" y="400" width="200" height="200" rx="10" fill="url(#i2cGrad)" stroke="#2E7D32" stroke-width="2"/>
   <text x="760" y="428" text-anchor="middle" class="comp-name">DS3231 RTC</text>
   <text x="760" y="444" text-anchor="middle" class="comp-desc">I2C · ±2ppm · Addr: 0x68</text>
+  <text x="760" y="460" text-anchor="middle" class="comp-desc">CR2032 백업 배터리</text>
 
   <rect x="654" y="485" width="6" height="14" rx="2" fill="#2196F3"/>
   <text x="662" y="496" class="pin-label">SDA</text>
+
   <rect x="654" y="515" width="6" height="14" rx="2" fill="#2196F3"/>
   <text x="662" y="526" class="pin-label">SCL</text>
+
   <rect x="654" y="555" width="6" height="14" rx="2" fill="#F44336"/>
   <text x="662" y="566" class="pin-label">VCC / GND</text>
 
-  <!-- ═══ Button ═══ -->
-  <rect x="30" y="530" width="200" height="120" rx="10" fill="url(#btnGrad)" stroke="#7B1FA2" stroke-width="2"/>
-  <text x="130" y="558" text-anchor="middle" class="comp-name">🔘 WiFi Button</text>
-  <text x="130" y="574" text-anchor="middle" class="comp-desc">D6/GPIO16 → GND</text>
-  <text x="130" y="590" text-anchor="middle" class="comp-desc">누르면 WiFi 켜짐</text>
-
-  <rect x="224" y="570" width="6" height="14" rx="2" fill="#9C27B0"/>
-  <text x="218" y="581" text-anchor="end" class="pin-label">BTN (D6)</text>
-  <rect x="224" y="600" width="6" height="14" rx="2" fill="#333"/>
-  <text x="218" y="611" text-anchor="end" class="pin-label">GND</text>
-
-  <!-- ═══ Battery ═══ -->
+  <!-- ════════════════════════════════════════════════ -->
+  <!-- 10000mAh Li-Po Battery (Bottom)                -->
+  <!-- ════════════════════════════════════════════════ -->
   <rect x="660" y="650" width="200" height="50" rx="10" fill="url(#pwrGrad)" stroke="#C62828" stroke-width="2"/>
   <text x="760" y="675" text-anchor="middle" class="comp-name">🔋 10000mAh Li-Po</text>
-  <text x="760" y="692" text-anchor="middle" class="comp-desc">3.7V · 약 154일</text>
+  <text x="760" y="692" text-anchor="middle" class="comp-desc">3.7V · 약 154일 수명</text>
 
-  <!-- ═══ WIRING ═══ -->
+  <!-- ════════════════════════════════════════════════ -->
+  <!-- WIRING — GPIO (Orange)                         -->
+  <!-- ════════════════════════════════════════════════ -->
 
-  <!-- GPIO: EPD -->
+  <!-- EPD BUSY -->
   <path d="M320,287 L230,287" class="wire-gpio" marker-end="url(#dot)"/>
+  <!-- EPD DC -->
   <path d="M320,317 L230,317" class="wire-gpio" marker-end="url(#dot)"/>
+  <!-- EPD RST -->
   <path d="M320,347 L230,347" class="wire-gpio" marker-end="url(#dot)"/>
+  <!-- EPD CS -->
   <path d="M320,377 L230,377" class="wire-gpio" marker-end="url(#dot)"/>
 
-  <!-- Button wire (purple) -->
-  <path d="M320,487 L230,577" class="wire-btn" marker-end="url(#dot)"/>
+  <!-- ════════════════════════════════════════════════ -->
+  <!-- WIRING — SPI Bus (Green)                       -->
+  <!-- ════════════════════════════════════════════════ -->
 
-  <!-- SPI -->
+  <!-- SCK: D8/GPIO19 → EPD CLK -->
   <path d="M540,287 L600,287 L600,100 L260,100 L260,417 L230,417" class="wire-spi" marker-end="url(#dot)"/>
+
+  <!-- MOSI: D10/GPIO18 → EPD DIN -->
   <path d="M540,347 L610,347 L610,90 L250,90 L250,447 L230,447" class="wire-spi" marker-end="url(#dot)"/>
 
-  <!-- I2C -->
+  <!-- ════════════════════════════════════════════════ -->
+  <!-- WIRING — I2C Bus (Blue)                        -->
+  <!-- ════════════════════════════════════════════════ -->
+
+  <!-- SDA: D4/GPIO22 → SHT40 SDA + DS3231 SDA -->
   <path d="M320,417 L280,417 L280,287 L660,287" class="wire-i2c" marker-end="url(#dot)"/>
+  <!-- SDA branch to DS3231 -->
   <path d="M280,492 L660,492" class="wire-i2c" marker-end="url(#dot)"/>
   <path d="M280,287 L280,492" class="wire-i2c"/>
 
+  <!-- SCL: D5/GPIO23 → SHT40 SCL + DS3231 SCL -->
   <path d="M320,447 L290,447 L290,317 L660,317" class="wire-i2c" marker-end="url(#dot)"/>
+  <!-- SCL branch to DS3231 -->
   <path d="M290,522 L660,522" class="wire-i2c" marker-end="url(#dot)"/>
   <path d="M290,317 L290,522" class="wire-i2c"/>
 
-  <!-- Power -->
+  <!-- ════════════════════════════════════════════════ -->
+  <!-- WIRING — Power (Red dashed)                    -->
+  <!-- ════════════════════════════════════════════════ -->
+
+  <!-- 3V3 → all modules VCC -->
   <path d="M540,417 L620,417 L620,80 L200,80" class="wire-pwr"/>
+  <!-- EPD VCC -->
   <path d="M200,80 L200,477 L230,477" class="wire-pwr" marker-end="url(#dot)"/>
+  <!-- SHT40 VCC -->
   <path d="M620,80 L620,357 L660,357" class="wire-pwr" marker-end="url(#dot)"/>
+  <!-- DS3231 VCC -->
   <path d="M620,357 L620,562 L660,562" class="wire-pwr" marker-end="url(#dot)"/>
+
+  <!-- BAT → XIAO BAT -->
   <path d="M660,675 L580,675 L580,517 L540,517" class="wire-pwr" marker-end="url(#dot)"/>
 
-  <!-- GND -->
-  <path d="M540,487 L630,487 L630,70 L210,70" class="wire-gnd"/>
-  <path d="M210,70 L210,497 L230,497" class="wire-gnd" marker-end="url(#dot)"/>
-  <!-- Button GND -->
-  <path d="M210,607 L230,607" class="wire-gnd" marker-end="url(#dot)"/>
-  <path d="M210,497 L210,607" class="wire-gnd"/>
+  <!-- ════════════════════════════════════════════════ -->
+  <!-- WIRING — GND (Gray dashed)                     -->
+  <!-- ════════════════════════════════════════════════ -->
 
-  <!-- Pull-ups -->
+  <path d="M540,487 L630,487 L630,70 L210,70" class="wire-gnd"/>
+  <!-- EPD GND -->
+  <path d="M210,70 L210,497 L230,497" class="wire-gnd" marker-end="url(#dot)"/>
+
+  <!-- ════════════════════════════════════════════════ -->
+  <!-- I2C Pull-up Resistors                          -->
+  <!-- ════════════════════════════════════════════════ -->
   <rect x="265" y="100" width="40" height="20" rx="3" fill="#FFF9C4" stroke="#F9A825" stroke-width="1"/>
   <text x="285" y="114" text-anchor="middle" font-size="9" fill="#F57F17">4.7kΩ</text>
   <line x1="285" y1="100" x2="285" y2="80" stroke="#F9A825" stroke-width="1"/>
   <line x1="285" y1="120" x2="285" y2="287" stroke="#F9A825" stroke-width="1" stroke-dasharray="3,2"/>
+  <text x="285" y="94" text-anchor="middle" font-size="8" fill="#F57F17">SDA</text>
 
   <rect x="295" y="100" width="40" height="20" rx="3" fill="#FFF9C4" stroke="#F9A825" stroke-width="1"/>
   <text x="315" y="114" text-anchor="middle" font-size="9" fill="#F57F17">4.7kΩ</text>
   <line x1="315" y1="100" x2="315" y2="80" stroke="#F9A825" stroke-width="1"/>
   <line x1="315" y1="120" x2="315" y2="317" stroke="#F9A825" stroke-width="1" stroke-dasharray="3,2"/>
+  <text x="315" y="94" text-anchor="middle" font-size="8" fill="#F57F17">SCL</text>
 
-  <!-- Legend -->
-  <rect x="30" y="730" width="860" height="40" rx="6" fill="#fff" stroke="#ddd" stroke-width="1"/>
+  <!-- ════════════════════════════════════════════════ -->
+  <!-- Legend                                          -->
+  <!-- ════════════════════════════════════════════════ -->
+  <rect x="30" y="670" width="860" height="40" rx="6" fill="#fff" stroke="#ddd" stroke-width="1"/>
 
-  <line x1="50" y1="750" x2="90" y2="750" class="wire-i2c"/>
-  <text x="95" y="754" class="legend-text">I2C</text>
+  <line x1="50" y1="690" x2="90" y2="690" class="wire-i2c"/>
+  <text x="95" y="694" class="legend-text">I2C (SDA/SCL)</text>
 
-  <line x1="140" y1="750" x2="180" y2="750" class="wire-spi"/>
-  <text x="185" y="754" class="legend-text">SPI</text>
+  <line x1="210" y1="690" x2="250" y2="690" class="wire-spi"/>
+  <text x="255" y="694" class="legend-text">SPI (SCK/MOSI)</text>
 
-  <line x1="230" y1="750" x2="270" y2="750" class="wire-gpio"/>
-  <text x="275" y="754" class="legend-text">GPIO</text>
+  <line x1="390" y1="690" x2="430" y2="690" class="wire-gpio"/>
+  <text x="435" y="694" class="legend-text">GPIO (CS/DC/RST/BUSY)</text>
 
-  <line x1="340" y1="750" x2="380" y2="750" class="wire-btn"/>
-  <text x="385" y="754" class="legend-text">Button</text>
+  <line x1="620" y1="690" x2="660" y2="690" class="wire-pwr"/>
+  <text x="665" y="694" class="legend-text">Power (3V3/BAT)</text>
 
-  <line x1="450" y1="750" x2="490" y2="750" class="wire-pwr"/>
-  <text x="495" y="754" class="legend-text">Power</text>
-
-  <line x1="560" y1="750" x2="600" y2="750" class="wire-gnd"/>
-  <text x="605" y="754" class="legend-text">GND</text>
+  <line x1="770" y1="690" x2="810" y2="690" class="wire-gnd"/>
+  <text x="815" y="694" class="legend-text">GND</text>
 </svg>

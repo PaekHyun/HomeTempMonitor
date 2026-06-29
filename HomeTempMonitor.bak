@@ -12,8 +12,6 @@
  *  ✅ DS3231 RTC → 정확한 타임스탬프 (I2C)
  *  ✅ WiFi NTP → 24시간마다 시간 동기화
  *  ✅ Web server → 브라우저에서 CSV 다운로드
- *  ✅ 버튼(D6) → 언제든 WiFi 켜서 CSV 다운로드
- *  ✅ WiFi AP 모드 → 공유기 없이도 직접 접속 가능
  *  ✅ Deep sleep → 초저전력 (~15uA)
  *  ✅ Min/Max 추적 (RTC 메모리 유지)
  *
@@ -51,8 +49,7 @@
 // ===================== CONFIGURATION =====================
 #define SLEEP_INTERVAL_MIN       5       // Deep sleep interval (minutes)
 #define WIFI_SYNC_INTERVAL_HR    24      // NTP sync every N hours
-#define WIFI_AP_TIMEOUT_SEC      300     // Web server active duration (seconds)
-#define WIFI_AP_SSID              "HomeTemp"  // AP 모드 이름 (비번 없음)
+#define WIFI_AP_TIMEOUT_SEC      120     // Web server active duration (seconds)
 #define SERIAL_BAUD              115200
 #define TIMEZONE_OFFSET_HR       9       // KST = UTC+9
 
@@ -94,9 +91,6 @@
 #define PIN_I2C_SDA     22   // D4
 #define PIN_I2C_SCL     23   // D5
 
-// User Button (WiFi 트리거)
-#define PIN_BUTTON      16   // D6 (GPIO16) — LOW = pressed
-
 // ===================== DISPLAY OBJECT =====================
 // 2.9" BWR (3-color): GDEM029C90, 128x296, SSD1680
 GxEPD2_3C<GxEPD2_290_C90c, GxEPD2_290_C90c::HEIGHT> display(
@@ -116,7 +110,6 @@ RTC_DATA_ATTR float    rtcMaxTemp      = -999.0f;
 RTC_DATA_ATTR float    rtcMinHum       = 999.0f;
 RTC_DATA_ATTR float    rtcMaxHum       = -999.0f;
 RTC_DATA_ATTR uint32_t lastWifiSyncBoot = 0;
-RTC_DATA_ATTR bool     forceWebServer  = false;  // 버튼 눌림 플래그
 
 // ===================== GLOBAL VARIABLES =====================
 float    g_temperature = NAN;
@@ -156,27 +149,18 @@ void setup() {
   // ── Step 4: Log data ──
   logData();
 
-  // ── Step 5: 버튼 체크 (D6 눌림 시 WiFi 즉시 활성화) ──
-  pinMode(PIN_BUTTON, INPUT_PULLUP);
-  bool buttonPressed = (digitalRead(PIN_BUTTON) == LOW);
-
-  // ── Step 6: WiFi sync & Web server ──
+  // ── Step 5: WiFi sync & Web server ──
   bool needWifiSync = (bootCount - lastWifiSyncBoot) >=
                        ((uint32_t)WIFI_SYNC_INTERVAL_HR * 60 / SLEEP_INTERVAL_MIN);
 
-  if (forceWebServer || buttonPressed || needWifiSync || bootCount == 1) {
-    forceWebServer = false;  // 1회만
+  if (needWifiSync || bootCount == 1) {
     startWifiAndSync();
   }
 
-  // ── Step 7: Deep Sleep ──
-  // 버튼 눌림 감지를 위해 GPIO16을 웨이크업 소스로 설정
-  esp_sleep_enable_ext0_wakeup(GPIO_NUM_16, 0);  // LOW(버튼 누름) 시 웨이크업
-  esp_sleep_enable_timer_wakeup(SLEEP_INTERVAL_MIN * 60ULL * 1000000ULL);
-
-  Serial.printf("\n>> Deep sleep for %d minutes... (버튼=D6 즉시 깨우기)\n\n", SLEEP_INTERVAL_MIN);
+  // ── Step 6: Deep Sleep ──
+  Serial.printf("\n>> Deep sleep for %d minutes...\n\n", SLEEP_INTERVAL_MIN);
   display.hibernate();
-  esp_deep_sleep_start();
+  esp_deep_sleep(SLEEP_INTERVAL_MIN * 60ULL * 1000000ULL);
 }
 
 void loop() {
@@ -297,8 +281,7 @@ void logData() {
 
 // ===================== WIFI & WEB SERVER =====================
 void startWifiAndSync() {
-  // ── 먼저 공유기(Station) 모드 시도 ──
-  Serial.println("[WiFi] Trying Station mode (공유기 연결)...");
+  Serial.println("[WiFi] Starting WiFi for NTP sync & web server...");
 
   webServer.onTimeSync([]() {
     syncRTCFromNTP();
@@ -307,151 +290,24 @@ void startWifiAndSync() {
   webServer.start(WIFI_SSID, WIFI_PASSWORD);
 
   if (webServer.isRunning()) {
-    // 공유기 연결 성공 → NTP 동기화 + 웹서버
     g_wifi_ok = true;
     lastWifiSyncBoot = bootCount;
-    runWebServer();
-  } else {
-    // 공유기 연결 실패 → AP 모드로 전환 (직접 접속)
-    Serial.println("[WiFi] Station failed. Starting AP mode...");
-    startAPMode();
-  }
-}
 
-void startAPMode() {
-  WiFi.mode(WIFI_AP);
-  WiFi.softAP(WIFI_AP_SSID);  // 개방형 AP (비번 없음)
+    Serial.printf("[WebServer] Active for %d seconds. Connect to download CSV.\n",
+      WIFI_AP_TIMEOUT_SEC);
 
-  IPAddress apIP = WiFi.softAPIP();
-  Serial.printf("[WiFi AP] SSID: \"%s\"\n", WIFI_AP_SSID);
-  Serial.printf("[WiFi AP] Connect to WiFi \"%s\" then open http://%s\n",
-    WIFI_AP_SSID, apIP.toString().c_str());
-
-  // E-Paper에 AP 정보 표시
-  showAPInfo(apIP);
-
-  // 간이 웹서버 시작
-  WiFiServer apServer(80);
-  apServer.begin();
-
-  unsigned long startMs = millis();
-  while (millis() - startMs < (unsigned long)WIFI_AP_TIMEOUT_SEC * 1000) {
-    WiFiClient client = apServer.available();
-    if (client) {
-      handleAPRequest(client);
+    unsigned long startMs = millis();
+    while (millis() - startMs < (unsigned long)WIFI_AP_TIMEOUT_SEC * 1000) {
+      webServer.handleClient();
+      delay(10);
     }
-    delay(10);
-  }
 
-  apServer.stop();
-  WiFi.softAPdisconnect(true);
-  Serial.println("[WiFi AP] Timeout. AP stopped.");
-}
-
-void handleAPRequest(WiFiClient &client) {
-  String request = "";
-  unsigned long timeout = millis() + 3000;
-  while (client.connected() && millis() < timeout) {
-    if (client.available()) {
-      char c = client.read();
-      request += c;
-      if (request.endsWith("\r\n\r\n")) break;
-    }
-  }
-
-  if (request.indexOf("GET /data.csv") >= 0) {
-    client.println("HTTP/1.1 200 OK");
-    client.println("Content-Type: text/csv; charset=utf-8");
-    client.println("Content-Disposition: attachment; filename=\"temp_data.csv\"");
-    client.println("Connection: close");
-    client.println();
-    logger.readAllCSV(client);
+    webServer.stop();
+    Serial.println("[WebServer] Timeout. WiFi disconnected.");
   } else {
-    client.println("HTTP/1.1 200 OK");
-    client.println("Content-Type: text/html; charset=utf-8");
-    client.println("Connection: close");
-    client.println();
-    client.println("<!DOCTYPE html><html><head><meta charset='utf-8'>");
-    client.println("<meta name='viewport' content='width=device-width,initial-scale=1'>");
-    client.println("<title>Home Temp Monitor</title></head><body>");
-    client.println("<h1>Home Temp Monitor (AP Mode)</h1>");
-    client.printf("<p>Records: %lu | File: %u bytes</p>",
-      logger.getRecordCount(), logger.getFileSize());
-    client.println("<br><a href='/data.csv' style='padding:15px 30px;background:#4CAF50;"
-      "color:#fff;text-decoration:none;border-radius:8px;font-size:18px'>"
-      "Download CSV</a>");
-    client.println("</body></html>");
+    g_wifi_ok = false;
+    Serial.println("[WiFi] Connection failed. Will retry next cycle.");
   }
-
-  delay(10);
-  client.stop();
-}
-
-void runWebServer() {
-  Serial.printf("[WebServer] Active for %d seconds. Connect to download CSV.\n",
-    WIFI_AP_TIMEOUT_SEC);
-
-  // E-Paper에 IP 표시
-  showIPInfo(WiFi.localIP());
-
-  unsigned long startMs = millis();
-  while (millis() - startMs < (unsigned long)WIFI_AP_TIMEOUT_SEC * 1000) {
-    webServer.handleClient();
-    delay(10);
-  }
-
-  webServer.stop();
-  Serial.println("[WebServer] Timeout. WiFi disconnected.");
-}
-
-void showIPInfo(IPAddress ip) {
-  display.setFullWindow();
-  display.firstPage();
-  do {
-    display.fillScreen(GxEPD_WHITE);
-    display.setFont(&FreeSansBold12pt7b);
-    display.setTextColor(GxEPD_BLACK);
-    display.setCursor(4, 30);
-    display.print("WiFi Connected!");
-    drawHLine(0, 36, 128, 2);
-    display.setFont(&FreeSansBold9pt7b);
-    display.setCursor(4, 56);
-    display.print("Open browser:");
-    display.setFont(&FreeSansBold12pt7b);
-    display.setCursor(4, 78);
-    display.printf("http://%s", ip.toString().c_str());
-    display.setFont(&FreeSansBold9pt7b);
-    display.setCursor(4, 100);
-    display.printf("Timeout: %d sec", WIFI_AP_TIMEOUT_SEC);
-    display.setCursor(4, 120);
-    display.print("Download CSV now!");
-  } while (display.nextPage());
-}
-
-void showAPInfo(IPAddress ip) {
-  display.setFullWindow();
-  display.firstPage();
-  do {
-    display.fillScreen(GxEPD_WHITE);
-    display.setFont(&FreeSansBold12pt7b);
-    display.setTextColor(GxEPD_RED);
-    display.setCursor(4, 30);
-    display.print("WiFi AP Mode");
-    drawHLine(0, 36, 128, 2);
-    display.setFont(&FreeSansBold9pt7b);
-    display.setTextColor(GxEPD_BLACK);
-    display.setCursor(4, 56);
-    display.print("1. Connect WiFi:");
-    display.setFont(&FreeSansBold12pt7b);
-    display.setCursor(4, 78);
-    display.print(WIFI_AP_SSID);
-    display.setFont(&FreeSansBold9pt7b);
-    display.setCursor(4, 98);
-    display.print("2. Open browser:");
-    display.setFont(&FreeSansBold12pt7b);
-    display.setCursor(4, 120);
-    display.printf("http://%s", ip.toString().c_str());
-  } while (display.nextPage());
 }
 
 // ===================== E-PAPER DISPLAY =====================
