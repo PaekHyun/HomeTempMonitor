@@ -133,49 +133,79 @@ void setup() {
   while (!Serial && millis() < 2000) delay(10);
 
   bootCount++;
+
+  // ── 웨이크업 원인 확인 ──
+  esp_sleep_wakeup_cause_t wakeupReason = esp_sleep_get_wakeup_cause();
+  const char* wakeupStr = "UNKNOWN";
+  if (wakeupReason == ESP_SLEEP_WAKEUP_TIMER)  wakeupStr = "TIMER";
+  else if (wakeupReason == ESP_SLEEP_WAKEUP_EXT1) wakeupStr = "BUTTON (GPIO16)";
+  else if (wakeupReason == ESP_SLEEP_WAKEUP_UNDEFINED) wakeupStr = "POWER_ON/RESET";
+
   Serial.println();
   Serial.println("╔══════════════════════════════════════════╗");
   Serial.printf ("║  Home Temp Monitor  -  Boot #%lu\n", bootCount);
+  Serial.printf ("║  Wakeup: %s\n", wakeupStr);
   Serial.println("╚══════════════════════════════════════════╝");
 
   // ── Step 1: I2C Bus + Sensors ──
+  Serial.println("[SETUP] Step 1: I2C + Sensors...");
   Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
+  Serial.printf("[I2C]  SDA=GPIO%d, SCL=GPIO%d\n", PIN_I2C_SDA, PIN_I2C_SCL);
   initRTC();
   initSHT40();
   readSensorData();
   updateMinMax();
 
   // ── Step 2: LittleFS (내장 플래시) ──
+  Serial.println("[SETUP] Step 2: LittleFS...");
   initLogger();
 
   // ── Step 3: SPI + E-Paper ──
+  Serial.println("[SETUP] Step 3: SPI + E-Paper...");
   SPI.begin(PIN_SPI_SCK, PIN_SPI_MISO, PIN_SPI_MOSI);
+  Serial.printf("[SPI]  SCK=GPIO%d, MISO=GPIO%d, MOSI=GPIO%d\n",
+    PIN_SPI_SCK, PIN_SPI_MISO, PIN_SPI_MOSI);
   initEPD();
   updateDisplay();
 
   // ── Step 4: Log data ──
+  Serial.println("[SETUP] Step 4: Log data...");
   logData();
 
   // ── Step 5: 버튼 체크 (D6 눌림 시 WiFi 즉시 활성화) ──
   pinMode(PIN_BUTTON, INPUT_PULLUP);
   bool buttonPressed = (digitalRead(PIN_BUTTON) == LOW);
+  Serial.printf("[SETUP] Step 5: Button D6=%s (wakeup was %s)\n",
+    buttonPressed ? "PRESSED" : "released", wakeupStr);
 
   // ── Step 6: WiFi sync & Web server ──
   bool needWifiSync = (bootCount - lastWifiSyncBoot) >=
                        ((uint32_t)WIFI_SYNC_INTERVAL_HR * 60 / SLEEP_INTERVAL_MIN);
 
+  Serial.printf("[SETUP] Step 6: WiFi check — forceWebServer=%d, button=%d, needSync=%d, bootCount=%lu\n",
+    (int)forceWebServer, (int)buttonPressed, (int)needWifiSync, bootCount);
+
   if (forceWebServer || buttonPressed || needWifiSync || bootCount == 1) {
     forceWebServer = false;  // 1회만
+    Serial.println("[SETUP] → Starting WiFi & Web server...");
     startWifiAndSync();
+  } else {
+    Serial.println("[SETUP] → WiFi skipped (not needed this cycle).");
   }
 
   // ── Step 7: Deep Sleep ──
+  Serial.println("[SETUP] Step 7: Preparing deep sleep...");
   // ESP32C6는 ext0 미지원 → ext1 사용 (GPIO 비트마스크)
   // GPIO16 LOW(버튼 누름) 시 웨이크업
   esp_sleep_enable_ext1_wakeup(BIT(GPIO_NUM_16), ESP_EXT1_WAKEUP_ALL_LOW);
   esp_sleep_enable_timer_wakeup(SLEEP_INTERVAL_MIN * 60ULL * 1000000ULL);
 
-  Serial.printf("\n>> Deep sleep for %d minutes... (버튼=D6 즉시 깨우기)\n\n", SLEEP_INTERVAL_MIN);
+  int battDays = estimateBatteryDays();
+  Serial.printf("\n>> Deep sleep for %d minutes... (버튼=D6 즉시 깨우기)\n", SLEEP_INTERVAL_MIN);
+  Serial.printf(">> Battery estimate: ~%d days remaining\n", battDays);
+  Serial.printf(">> Next WiFi sync in %lu boots\n\n",
+    (uint32_t)WIFI_SYNC_INTERVAL_HR * 60 / SLEEP_INTERVAL_MIN - (bootCount - lastWifiSyncBoot));
+
   display.hibernate();
   esp_deep_sleep_start();
 }
