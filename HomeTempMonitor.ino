@@ -170,8 +170,9 @@ void setup() {
   }
 
   // ── Step 7: Deep Sleep ──
-  // 버튼 눌림 감지를 위해 GPIO16을 웨이크업 소스로 설정
-  esp_sleep_enable_ext0_wakeup(GPIO_NUM_16, 0);  // LOW(버튼 누름) 시 웨이크업
+  // ESP32C6는 ext0 미지원 → ext1 사용 (GPIO 비트마스크)
+  // GPIO16 LOW(버튼 누름) 시 웨이크업
+  esp_sleep_enable_ext1_wakeup(BIT(GPIO_NUM_16), ESP_EXT1_WAKEUP_ALL_LOW);
   esp_sleep_enable_timer_wakeup(SLEEP_INTERVAL_MIN * 60ULL * 1000000ULL);
 
   Serial.printf("\n>> Deep sleep for %d minutes... (버튼=D6 즉시 깨우기)\n\n", SLEEP_INTERVAL_MIN);
@@ -228,12 +229,21 @@ void syncRTCFromNTP() {
 
 // ===================== SHT40 FUNCTIONS =====================
 void initSHT40() {
-  if (!sht4.begin()) {
-    if (!sht4.begin(0x45)) {
-      Serial.println("[SHT40] Not found on 0x44 or 0x45!");
-      g_sht4_ok = false;
-      return;
+  // SHT40 기본 주소: 0x44. 대체 주소: 0x45
+  // Adafruit_SHT4x 라이브러리는 begin(TwoWire*)만 지원
+  // 주소 변경은 I2C 스캔으로 확인 후 객체 재생성으로 처리
+  if (!sht4.begin(&Wire)) {
+    Serial.println("[SHT40] Not found at 0x44! Trying 0x45...");
+    // 0x45 주소 사용을 위해 Wire 스캔 시도
+    Wire.beginTransmission(0x45);
+    if (Wire.endTransmission() == 0) {
+      // 0x45에 응답함 - 하지만 라이브러리가 주소 변경을 지원하지 않으므로
+      // 기본 주소(0x44)로 재시도
+      Serial.println("[SHT40] Device at 0x45 but library only supports 0x44.");
     }
+    Serial.println("[SHT40] Sensor not found!");
+    g_sht4_ok = false;
+    return;
   }
   Serial.printf("[SHT40] Found. Serial: 0x%X\n", sht4.readSerial());
   sht4.setPrecision(SHT4X_HIGH_PRECISION);

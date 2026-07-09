@@ -171,6 +171,8 @@ bool DataLogger::countRecords() {
   return true;
 }
 
+void DataLogger_rotateLog(); // forward declaration
+
 bool DataLogger::rotateLog() {
   // 파일의 뒤쪽 절반만 유지
   File file = LittleFS.open(LOG_FILE_PATH, "r");

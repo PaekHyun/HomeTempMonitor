@@ -42,6 +42,7 @@ private:
   uint32_t _recordCount;
   
   bool countRecords();
+  bool rotateLog();
 };
 
 #endif // DATA_LOGGER_H
