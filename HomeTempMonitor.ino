@@ -194,24 +194,38 @@ void setup() {
   }
 
   // ── Step 7: Deep Sleep ──
-  Serial.println("[SETUP] Step 7: Preparing deep sleep...");
+  Serial.println("[SETUP] Step 7: Deep sleep DISABLED for debugging");
   // ESP32C6는 ext0 미지원 → ext1 사용 (GPIO 비트마스크)
   // GPIO16 LOW(버튼 누름) 시 웨이크업
-  esp_sleep_enable_ext1_wakeup(BIT(GPIO_NUM_16), ESP_EXT1_WAKEUP_ALL_LOW);
-  esp_sleep_enable_timer_wakeup(SLEEP_INTERVAL_MIN * 60ULL * 1000000ULL);
+  //esp_sleep_enable_ext1_wakeup(BIT(GPIO_NUM_16), ESP_EXT1_WAKEUP_ALL_LOW);
+  //esp_sleep_enable_timer_wakeup(SLEEP_INTERVAL_MIN * 60ULL * 1000000ULL);
 
   int battDays = estimateBatteryDays();
-  Serial.printf("\n>> Deep sleep for %d minutes... (버튼=D6 즉시 깨우기)\n", SLEEP_INTERVAL_MIN);
+  Serial.printf(">> Deep sleep DISABLED (debug mode)\n");
   Serial.printf(">> Battery estimate: ~%d days remaining\n", battDays);
-  Serial.printf(">> Next WiFi sync in %lu boots\n\n",
+  Serial.printf(">> Next WiFi sync in %lu boots\n",
     (uint32_t)WIFI_SYNC_INTERVAL_HR * 60 / SLEEP_INTERVAL_MIN - (bootCount - lastWifiSyncBoot));
 
-  display.hibernate();
-  esp_deep_sleep_start();
+  //display.hibernate();
+  //esp_deep_sleep_start();
+  Serial.println(">> Setup complete. Entering loop() for debug...");
+}
 }
 
 void loop() {
-  // Never reached — deep sleep resets the MCU
+  // Deep sleep 비활성화 시 디버그용 루프
+  static unsigned long lastReadMs = 0;
+  if (millis() - lastReadMs >= 10000) {  // 10초마다 재측정
+    lastReadMs = millis();
+    Serial.println("\n--- loop() periodic read ---");
+    readSensorData();
+    updateMinMax();
+    logData();
+    updateDisplay();
+    Serial.printf("[LOOP] Temp: %.1f C | Hum: %.1f %% | Boot: %lu\n",
+      g_temperature, g_humidity, bootCount);
+  }
+  delay(100);
 }
 
 // ===================== RTC FUNCTIONS =====================
