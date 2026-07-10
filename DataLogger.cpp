@@ -46,11 +46,10 @@ bool DataLogger::logData(uint32_t unixtime, float temperature, float humidity) {
   }
 
   // Unix timestamp → 읽을 수 있는 시간으로 변환
+  // 주의: RTC에 이미 KST(UTC+9)로 저장되어 있으므로
+  // unixtime()도 KST 기준이며, 추가 보정 없이 그대로 변환
   time_t rawtime = unixtime;
   struct tm *timeinfo = gmtime(&rawtime);
-  // KST = UTC+9 보정
-  rawtime += 9 * 3600;
-  timeinfo = gmtime(&rawtime);
   char timeBuf[25];
   strftime(timeBuf, sizeof(timeBuf), "%Y-%m-%d %H:%M:%S", timeinfo);
 
