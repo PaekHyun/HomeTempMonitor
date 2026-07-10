@@ -129,6 +129,11 @@ DateTime g_rtcNow;
 
 // ===================== SETUP =====================
 void setup() {
+  // ── 버튼 핀 최우선 설정 (floating 방지) ──
+  // Deep Sleep 웨이크업 직후에도 안정적인 HIGH 보장
+  pinMode(PIN_BUTTON, INPUT_PULLUP);
+  delay(1);  // 풀업 안정화 대기
+
   Serial.begin(SERIAL_BAUD);
   while (!Serial && millis() < 2000) delay(10);
 
@@ -173,10 +178,12 @@ void setup() {
   logData();
 
   // ── Step 5: 버튼 체크 (D6 눌림 시 WiFi 즉시 활성화) ──
-  pinMode(PIN_BUTTON, INPUT_PULLUP);
+  // 주의: 이미 setup() 최상단에서 pinMode(INPUT_PULLUP) 설정됨
   bool buttonPressed = (digitalRead(PIN_BUTTON) == LOW);
-  Serial.printf("[SETUP] Step 5: Button D6=%s (wakeup was %s)\n",
-    buttonPressed ? "PRESSED" : "released", wakeupStr);
+  // 웨이크업 원인이 버튼이면 버튼을 뗐어도 WiFi 켜기
+  bool wokeByButton = (wakeupReason == ESP_SLEEP_WAKEUP_EXT1);
+  Serial.printf("[SETUP] Step 5: Button D6=%s, wokeByButton=%s\n",
+    buttonPressed ? "PRESSED" : "released", wokeByButton ? "YES" : "no");
 
   // ── Step 6: WiFi sync & Web server ──
   bool needWifiSync = (bootCount - lastWifiSyncBoot) >=
@@ -185,7 +192,7 @@ void setup() {
   Serial.printf("[SETUP] Step 6: WiFi check — forceWebServer=%d, button=%d, needSync=%d, bootCount=%lu\n",
     (int)forceWebServer, (int)buttonPressed, (int)needWifiSync, bootCount);
 
-  if (forceWebServer || buttonPressed || needWifiSync || bootCount == 1) {
+  if (forceWebServer || buttonPressed || wokeByButton || needWifiSync || bootCount == 1) {
     forceWebServer = false;  // 1회만
     Serial.println("[SETUP] → Starting WiFi & Web server...");
     startWifiAndSync();
