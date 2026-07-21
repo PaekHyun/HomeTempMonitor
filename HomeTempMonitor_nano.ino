@@ -41,6 +41,7 @@
 #include <Fonts/FreeSansBold18pt7b.h>
 #include <Fonts/FreeSansBold24pt7b.h>
 #include <Adafruit_SHT4x.h>
+#include <Adafruit_NeoPixel.h>
 #include <SPI.h>
 #include <WiFi.h>
 #include <LittleFS.h>
@@ -116,8 +117,13 @@
 #define PIN_I2C_SCL      7   // D7  (GPIO7)
 
 // User Button (WiFi 트리거)
-// ⚠️ GPIO8은 RGB LED와 공유 → 버튼 사용 시 LED 초기화 안 함
+// ⚠️ GPIO8은 RGB LED와 공유 → 버튼 사용 시 LED 비활성화 필요
 #define PIN_BUTTON       8   // D8  (GPIO8) — LOW = pressed
+
+// RGB LED (WS2812) — GPIO8과 공유, 버튼 사용 시 반드시 끄기
+#define PIN_RGB_LED      8   // GPIO8 (WS2812)
+#define NUM_RGB_LEDS     1
+Adafruit_NeoPixel rgbLED(NUM_RGB_LEDS, PIN_RGB_LED, NEO_GRB + NEO_KHZ800);
 
 // ===================== DISPLAY OBJECT =====================
 // 2.9" BWR (3-color): GDEM029C90, 128x296, SSD1680
@@ -151,6 +157,15 @@ DateTime g_rtcNow;
 
 // ===================== SETUP =====================
 void setup() {
+  // ── RGB LED 끄기 (GPIO8 공유 → 버튼 사용 위해 LED 비활성화) ──
+  // WS2812는 전원 인가 시 랜덤 색상이 표시될 수 있으므로
+  // 가장 먼저 꺼야 함 (전력 절약 + GPIO8 버튼 충돌 방지)
+  rgbLED.begin();
+  rgbLED.setPixelColor(0, rgbLED.Color(0, 0, 0));  // 검정 = OFF
+  rgbLED.show();
+  pinMode(PIN_RGB_LED, INPUT);  // LED 핀을 입력으로 전환 → 버튼과 공유 핀 충돌 방지
+  Serial.println("[RGB] LED turned OFF (GPIO8 shared with button)");
+
   // ── 버튼 핀 최우선 설정 (floating 방지) ──
   // Deep Sleep 웨이크업 직후에도 안정적인 HIGH 보장
   pinMode(PIN_BUTTON, INPUT_PULLUP);
