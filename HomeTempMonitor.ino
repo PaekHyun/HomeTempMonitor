@@ -1,7 +1,7 @@
 /*
  * ═══════════════════════════════════════════════════════════════
  *  Home Temperature & Humidity Monitor
- *  XIAO ESP32C6 + SHT40 + 2.9" E-Paper + DS3231
+ *  ESP32-C6 + SHT40 + 2.9" E-Paper + DS3231
  *  (내장 플래시 LittleFS 저장)
  * ═══════════════════════════════════════════════════════════════
  *
@@ -12,25 +12,44 @@
  *  ✅ DS3231 RTC → 정확한 타임스탬프 (I2C)
  *  ✅ WiFi NTP → 24시간마다 시간 동기화
  *  ✅ Web server → 브라우저에서 CSV 다운로드
- *  ✅ 버튼(D6) → 언제든 WiFi 켜서 CSV 다운로드
+ *  ✅ 버튼 → 언제든 WiFi 켜서 CSV 다운로드
  *  ✅ WiFi AP 모드 → 공유기 없이도 직접 접속 가능
  *  ✅ Deep sleep → 초저전력 (~15uA)
  *  ✅ Min/Max 추적 (RTC 메모리 유지)
+ *
+ * Board Selection:
+ *  아래 BOARD_SELECT 중 하나만 #define 하세요.
+ *    BOARD_XIAO_ESP32C6  → Seeed XIAO ESP32C6 (4MB Flash)
+ *    BOARD_NANO_ESP32C6  → nanoESP32-C6 (16MB Flash)
  *
  * Required Libraries (Arduino Library Manager):
  *  - GxEPD2 by Jean-Marc Capello
  *  - Adafruit SHT4x Library
  *  - Adafruit GFX Library (GxEPD2 dependency)
+ *  - Adafruit NeoPixel (nanoESP32-C6만 필요, XIAO는 미사용)
  *
  * Board Package:
  *  - esp32 by Espressif v3.0.0+ (ESP32C6 support)
- *  - Board: "XIAO_ESP32C6"
+ *  - XIAO: Board "XIAO_ESP32C6"
+ *  - nano: Board "ESP32C6 Dev Module"
  *
  * 파티션 설정:
- *  - Tools → Partition Scheme →
- *    "Default 4MB with spiffs (1.2MB APP/1.5MB SPIFFS)"
- *    또는 커스텀 파티션 테이블 사용
+ *  - XIAO (4MB): "Default 4MB with spiffs (1.2MB APP/1.5MB SPIFFS)"
+ *  - nano (16MB): Custom → partitions_16mb.csv
  */
+
+// ===================== BOARD SELECTION =====================
+// ✏️ 사용할 보드를 하나만 #define 하세요. 나머지는 주석 처리!
+#define BOARD_XIAO_ESP32C6
+// #define BOARD_NANO_ESP32C6
+
+// ── 보드별 유효성 검사 ──
+#if !defined(BOARD_XIAO_ESP32C6) && !defined(BOARD_NANO_ESP32C6)
+  #error "BOARD_XIAO_ESP32C6 또는 BOARD_NANO_ESP32C6 중 하나를 #define 하세요!"
+#endif
+#if defined(BOARD_XIAO_ESP32C6) && defined(BOARD_NANO_ESP32C6)
+  #error "보드는 하나만 선택할 수 있습니다! 하나를 주석 처리하세요."
+#endif
 
 // ===================== INCLUDES =====================
 #include <GxEPD2_3C.h>
@@ -39,6 +58,9 @@
 #include <Fonts/FreeSansBold18pt7b.h>
 #include <Fonts/FreeSansBold24pt7b.h>
 #include <Adafruit_SHT4x.h>
+#ifdef BOARD_NANO_ESP32C6
+  #include <Adafruit_NeoPixel.h>
+#endif
 #include <SPI.h>
 #include <WiFi.h>
 #include <LittleFS.h>
@@ -61,41 +83,59 @@
 #define WIFI_PASSWORD            "your_wifi_password"
 
 // ===================== PIN DEFINITIONS =====================
-// ┌─────────────────────────────────────────────────────────────┐
-// │  XIAO ESP32C6 Pin Assignment                                │
-// ├──────────┬──────────┬───────────────────────────────────────┤
-// │  Pin     │  GPIO    │  Function                             │
-// ├──────────┼──────────┼───────────────────────────────────────┤
-// │  D0      │  GPIO0   │  EPD BUSY                            │
-// │  D1      │  GPIO1   │  EPD DC (Data/Command)               │
-// │  D2      │  GPIO2   │  EPD RST (Reset)                     │
-// │  D3      │  GPIO21  │  EPD CS (Chip Select)                │
-// │  D4      │  GPIO22  │  I2C SDA (SHT40 + DS3231)            │
-// │  D5      │  GPIO23  │  I2C SCL (SHT40 + DS3231)            │
-// │  D6      │  GPIO16  │  (available)                         │
-// │  D7      │  GPIO17  │  (available)                         │
-// │  D8      │  GPIO19  │  SPI SCK                             │
-// │  D9      │  GPIO20  │  SPI MISO (EPD 미사용, 예약)         │
-// │  D10     │  GPIO18  │  SPI MOSI                            │
-// └──────────┴──────────┴───────────────────────────────────────┘
+// ┌─────────────────────────────────────────────────────────────────────┐
+// │  핀맵 비교                                                          │
+// ├──────────┬──────────────────┬──────────────────┬───────────────────┤
+// │  기능     │  XIAO ESP32C6    │  nanoESP32-C6    │  비고             │
+// ├──────────┼──────────────────┼──────────────────┼───────────────────┤
+// │  SPI SCK │  GPIO19 (D8)     │  GPIO2  (D2)     │                  │
+// │  SPI MISO│  GPIO20 (D9)     │  GPIO3  (D3)     │ EPD 미사용        │
+// │  SPI MOSI│  GPIO18 (D10)    │  GPIO4  (D4)     │                  │
+// │  EPD CS  │  GPIO21 (D3)     │  GPIO5  (D5)     │                  │
+// │  EPD DC  │  GPIO1  (D1)     │  GPIO1  (D1)     │ 동일              │
+// │  EPD RST │  GPIO2  (D2)     │  GPIO9  (D9)     │                  │
+// │  EPD BUSY│  GPIO0  (D0)     │  GPIO0  (D0)     │ 동일              │
+// │  I2C SDA │  GPIO22 (D4)     │  GPIO6  (D6)     │                  │
+// │  I2C SCL │  GPIO23 (D5)     │  GPIO7  (D7)     │                  │
+// │  Button  │  GPIO16 (D6)     │  GPIO8  (D8)     │ ⚠️ nano: RGB공유  │
+// └──────────┴──────────────────┴──────────────────┴───────────────────┘
 
-// SPI Bus (e-paper only)
-#define PIN_SPI_SCK     19   // D8
-#define PIN_SPI_MISO    20   // D9  (EPD는 미사용, 예약)
-#define PIN_SPI_MOSI    18   // D10
+#ifdef BOARD_XIAO_ESP32C6
+  // ── XIAO ESP32C6 핀 정의 ──
+  #define PIN_SPI_SCK     19   // D8
+  #define PIN_SPI_MISO    20   // D9  (EPD 미사용, 예약)
+  #define PIN_SPI_MOSI    18   // D10
+  #define PIN_EPD_CS      21   // D3
+  #define PIN_EPD_DC       1   // D1
+  #define PIN_EPD_RST      2   // D2
+  #define PIN_EPD_BUSY     0   // D0
+  #define PIN_I2C_SDA     22   // D4
+  #define PIN_I2C_SCL     23   // D5
+  #define PIN_BUTTON      16   // D6 (GPIO16) — LOW = pressed
+  #define BOARD_NAME      "XIAO ESP32C6"
+  #define BUTTON_WAKE_GPIO GPIO_NUM_16
+#elif defined(BOARD_NANO_ESP32C6)
+  // ── nanoESP32-C6 핀 정의 ──
+  #define PIN_SPI_SCK      2   // D2  (GPIO2)
+  #define PIN_SPI_MISO     3   // D3  (GPIO3) — EPD 미사용, 예약
+  #define PIN_SPI_MOSI     4   // D4  (GPIO4)
+  #define PIN_EPD_CS       5   // D5  (GPIO5)
+  #define PIN_EPD_DC       1   // D1  (GPIO1)
+  #define PIN_EPD_RST      9   // D9  (GPIO9)
+  #define PIN_EPD_BUSY     0   // D0  (GPIO0)
+  #define PIN_I2C_SDA      6   // D6  (GPIO6)
+  #define PIN_I2C_SCL      7   // D7  (GPIO7)
+  #define PIN_BUTTON       8   // D8  (GPIO8) — LOW = pressed
+  #define PIN_RGB_LED      8   // GPIO8 (WS2812, 버튼과 공유)
+  #define NUM_RGB_LEDS     1
+  #define BOARD_NAME      "nanoESP32-C6"
+  #define BUTTON_WAKE_GPIO GPIO_NUM_8
+#endif
 
-// E-Paper (2.9" BWR, SSD1680)
-#define PIN_EPD_CS      21   // D3
-#define PIN_EPD_DC       1   // D1
-#define PIN_EPD_RST      2   // D2
-#define PIN_EPD_BUSY     0   // D0
-
-// I2C (SHT40 + DS3231)
-#define PIN_I2C_SDA     22   // D4
-#define PIN_I2C_SCL     23   // D5
-
-// User Button (WiFi 트리거)
-#define PIN_BUTTON      16   // D6 (GPIO16) — LOW = pressed
+// ===================== BOARD-SPECIFIC OBJECTS =====================
+#ifdef BOARD_NANO_ESP32C6
+  Adafruit_NeoPixel rgbLED(NUM_RGB_LEDS, PIN_RGB_LED, NEO_GRB + NEO_KHZ800);
+#endif
 
 // ===================== DISPLAY OBJECT =====================
 // 2.9" BWR (3-color): GDEM029C90, 128x296, SSD1680
@@ -129,6 +169,17 @@ DateTime g_rtcNow;
 
 // ===================== SETUP =====================
 void setup() {
+  // ── nanoESP32-C6: RGB LED 끄기 (GPIO8 공유 → 버튼 충돌 방지) ──
+  // WS2812는 전원 인가 시 랜덤 색상이 표시될 수 있으므로
+  // 가장 먼저 꺼야 함 (전력 절약 + GPIO8 버튼 충돌 방지)
+#ifdef BOARD_NANO_ESP32C6
+  rgbLED.begin();
+  rgbLED.setPixelColor(0, rgbLED.Color(0, 0, 0));  // 검정 = OFF
+  rgbLED.show();
+  pinMode(PIN_RGB_LED, INPUT);  // LED 핀을 입력으로 전환 → 버튼과 공유 핀 충돌 방지
+  Serial.println("[RGB] LED turned OFF (GPIO8 shared with button)");
+#endif
+
   // ── 버튼 핀 최우선 설정 (floating 방지) ──
   // Deep Sleep 웨이크업 직후에도 안정적인 HIGH 보장
   pinMode(PIN_BUTTON, INPUT_PULLUP);
@@ -143,12 +194,13 @@ void setup() {
   esp_sleep_wakeup_cause_t wakeupReason = esp_sleep_get_wakeup_cause();
   const char* wakeupStr = "UNKNOWN";
   if (wakeupReason == ESP_SLEEP_WAKEUP_TIMER)  wakeupStr = "TIMER";
-  else if (wakeupReason == ESP_SLEEP_WAKEUP_EXT1) wakeupStr = "BUTTON (GPIO16)";
+  else if (wakeupReason == ESP_SLEEP_WAKEUP_EXT1) wakeupStr = "BUTTON (" BOARD_NAME ")";
   else if (wakeupReason == ESP_SLEEP_WAKEUP_UNDEFINED) wakeupStr = "POWER_ON/RESET";
 
   Serial.println();
   Serial.println("╔══════════════════════════════════════════╗");
   Serial.printf ("║  Home Temp Monitor  -  Boot #%lu\n", bootCount);
+  Serial.printf ("║  Board: %s\n", BOARD_NAME);
   Serial.printf ("║  Wakeup: %s\n", wakeupStr);
   Serial.println("╚══════════════════════════════════════════╝");
 
@@ -177,13 +229,13 @@ void setup() {
   Serial.println("[SETUP] Step 4: Log data...");
   logData();
 
-  // ── Step 5: 버튼 체크 (D6 눌림 시 WiFi 즉시 활성화) ──
+  // ── Step 5: 버튼 체크 (눌림 시 WiFi 즉시 활성화) ──
   // 주의: 이미 setup() 최상단에서 pinMode(INPUT_PULLUP) 설정됨
   bool buttonPressed = (digitalRead(PIN_BUTTON) == LOW);
   // 웨이크업 원인이 버튼이면 버튼을 뗐어도 WiFi 켜기
   bool wokeByButton = (wakeupReason == ESP_SLEEP_WAKEUP_EXT1);
-  Serial.printf("[SETUP] Step 5: Button D6=%s, wokeByButton=%s\n",
-    buttonPressed ? "PRESSED" : "released", wokeByButton ? "YES" : "no");
+  Serial.printf("[SETUP] Step 5: Button GPIO%d=%s, wokeByButton=%s\n",
+    PIN_BUTTON, buttonPressed ? "PRESSED" : "released", wokeByButton ? "YES" : "no");
 
   // ── Step 6: WiFi sync & Web server ──
   bool needWifiSync = (bootCount - lastWifiSyncBoot) >=
@@ -203,8 +255,8 @@ void setup() {
   // ── Step 7: Deep Sleep ──
   Serial.println("[SETUP] Step 7: Deep sleep DISABLED for debugging");
   // ESP32C6는 ext0 미지원 → ext1 사용 (GPIO 비트마스크)
-  // GPIO16 LOW(버튼 누름) 시 웨이크업
-  //esp_sleep_enable_ext1_wakeup(BIT(GPIO_NUM_16), ESP_EXT1_WAKEUP_ALL_LOW);
+  // 버튼 누름 시 웨이크업
+  //esp_sleep_enable_ext1_wakeup(BIT(BUTTON_WAKE_GPIO), ESP_EXT1_WAKEUP_ALL_LOW);
   //esp_sleep_enable_timer_wakeup(SLEEP_INTERVAL_MIN * 60ULL * 1000000ULL);
 
   int battDays = estimateBatteryDays();
@@ -216,7 +268,6 @@ void setup() {
   //display.hibernate();
   //esp_deep_sleep_start();
   Serial.println(">> Setup complete. Entering loop() for debug...");
-}
 }
 
 void loop() {
@@ -281,15 +332,10 @@ void syncRTCFromNTP() {
 // ===================== SHT40 FUNCTIONS =====================
 void initSHT40() {
   // SHT40 기본 주소: 0x44. 대체 주소: 0x45
-  // Adafruit_SHT4x 라이브러리는 begin(TwoWire*)만 지원
-  // 주소 변경은 I2C 스캔으로 확인 후 객체 재생성으로 처리
   if (!sht4.begin(&Wire)) {
     Serial.println("[SHT40] Not found at 0x44! Trying 0x45...");
-    // 0x45 주소 사용을 위해 Wire 스캔 시도
     Wire.beginTransmission(0x45);
     if (Wire.endTransmission() == 0) {
-      // 0x45에 응답함 - 하지만 라이브러리가 주소 변경을 지원하지 않으므로
-      // 기본 주소(0x44)로 재시도
       Serial.println("[SHT40] Device at 0x45 but library only supports 0x44.");
     }
     Serial.println("[SHT40] Sensor not found!");
@@ -535,32 +581,6 @@ void updateDisplay() {
 }
 
 void drawLayout() {
-  // ─── Display: 128 x 296 (portrait) ───
-  //
-  //  ┌──────────────────────┐ y=0
-  //  │  Home Climate        │ 12pt  y=18
-  //  │══════════════════════│ y=24
-  //  │                      │
-  //  │  TEMPERATURE (빨강)  │ 9pt   y=44
-  //  │                      │
-  //  │    24.5°C            │ 24pt  y=82
-  //  │                      │
-  //  │  22.1~26.3°C (빨강) │ 9pt   y=100
-  //  │                      │
-  //  │──────────────────────│ y=112
-  //  │                      │
-  //  │  HUMIDITY            │ 9pt   y=130
-  //  │                      │
-  //  │    45.2%             │ 24pt  y=168
-  //  │                      │
-  //  │  40.0~55.2%          │ 9pt   y=186
-  //  │                      │
-  //  │══════════════════════│ y=200
-  //  │  2026-06-30 07:23    │ 9pt   y=216
-  //  │  SHT:OK  Log:OK      │ 9pt   y=232
-  //  │  #42  5min  ~154d    │ 9pt   y=248
-  //  └──────────────────────┘
-
   // ── Title ──
   display.setFont(&FreeSansBold12pt7b);
   display.setTextColor(GxEPD_BLACK);
