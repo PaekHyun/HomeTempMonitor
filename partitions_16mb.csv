@@ -1,0 +1,28 @@
+# Name,   Type, SubType, Offset,  Size, Flags
+# Note: if you have increased the partition size, you must also increase the flash size in menuconfig
+#
+# 16MB Flash for ESP32-C6 (nanoESP32-C6 N16)
+# - Bootloader: 32KB
+# - Partition Table: 32KB  
+# - OTA Data: 8KB
+# - PHY Init Data: 4KB
+# - App: 3.2MB (larger app partition for future features)
+# - LittleFS: ~12.5MB (data storage)
+#
+# Total: 16MB = 16384KB
+#
+
+# Bootloader (offset 0x0000, size 32KB) - automatically placed
+# Partition table (offset 0x8000, size 32KB) - automatically placed
+
+# OTA data
+otadata, data, ota, 0x9000, 0x2000,
+
+# PHY init data
+phy_init, data, phy, 0xb000, 0x1000,
+
+# Application (3.2MB)
+app0, app, ota_0, 0x10000, 0x320000,
+
+# LittleFS data storage (~12.5MB)
+storage, data, spiffs, 0x330000, 0xCD0000,
