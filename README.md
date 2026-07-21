@@ -18,10 +18,12 @@ XIAO ESP32C6 / nanoESP32-C6 + SHT40 + 2.9" E-Paper + DS3231 (내장 플래시 Li
 
 ### 지원 보드
 
-| 보드 | .ino 파일 | 비고 |
+| 보드 | `#define` | 비고 |
 |------|----------|------|
-| **XIAO ESP32C6** | `HomeTempMonitor.ino` | 배터리 충전 회로 내장 |
-| **nanoESP32-C6** | `HomeTempMonitor_nano.ino` | USB 2개, **16MB Flash**, 배터리 충전 회로 없음 |
+| **XIAO ESP32C6** | `BOARD_XIAO_ESP32C6` | 배터리 충전 회로 내장, 4MB Flash |
+| **nanoESP32-C6** | `BOARD_NANO_ESP32C6` | USB 2개, **16MB Flash**, 배터리 충전 회로 없음 |
+
+> `.ino` 파일 상단에서 사용할 보드의 `#define`만 활성화하세요. 자세한 방법은 [보드 선택 방법](#-보드-선택-방법) 참조.
 
 ---
 
@@ -104,9 +106,9 @@ GND           ────────  모든 모듈 GND
 
 ```
 HomeTempMonitor/
-├── HomeTempMonitor.ino        ← XIAO ESP32C6용 메인 스케치
-├── HomeTempMonitor_nano.ino   ← nanoESP32-C6용 메인 스케치
+├── HomeTempMonitor.ino        ← 메인 스케치 (#ifdef로 보드 선택)
 ├── partitions_16mb.csv        ← 16MB Flash 커스텀 파티션 테이블 (nano용)
+├── .gitignore                 ← Git 추적 제외 (*.bak 등)
 ├── DataLogger.h               ← LittleFS 데이터 로거 헤더
 ├── DataLogger.cpp             ← LittleFS 데이터 로거 구현
 ├── RTClib_DS3231.h            ← DS3231 RTC 드라이버 헤더
@@ -121,9 +123,29 @@ HomeTempMonitor/
 └── README.md                  ← 이 파일
 ```
 
-> ⚠️ Arduino IDE에서는 폴더 내에 .ino 파일이 1개여야 합니다.
-> nanoESP32-C6로 빌드할 때는 `HomeTempMonitor.ino`를 삭제하거나 이름을 바꾸고
-> `HomeTempMonitor_nano.ino`를 `HomeTempMonitor.ino`로 이름 변경해서 사용하세요.
+### 🎛️ 보드 선택 방법
+
+`HomeTempMonitor.ino` 파일 상단에서 사용할 보드만 `#define` 하세요:
+
+```cpp
+// ✏️ 사용할 보드를 하나만 #define 하세요. 나머지는 주석 처리!
+#define BOARD_XIAO_ESP32C6      // ← XIAO 사용 시
+// #define BOARD_NANO_ESP32C6   // ← nano 사용 시 (위 줄 주석, 이 줄 해제)
+```
+
+- 둘 다 `#define`하면 → **컴파일 에러** (`보드는 하나만 선택할 수 있습니다!`)
+- 둘 다 주석 처리하면 → **컴파일 에러** (`BOARD_XIAO_ESP32C6 또는 BOARD_NANO_ESP32C6 중 하나를 #define 하세요!`)
+
+`#ifdef`로 자동 처리되는 항목:
+
+| 항목 | XIAO | nano |
+|------|------|------|
+| 핀 정의 (SPI, I2C, EPD, Button) | GPIO19/20/18, 22/23, 21, 16 | GPIO2/3/4, 6/7, 5, 8 |
+| `Adafruit_NeoPixel` include | ❌ 제외 | ✅ 포함 |
+| `rgbLED` 객체 생성 | ❌ 없음 | ✅ 생성 |
+| `setup()` RGB LED 끄기 | ❌ 스킵 | ✅ 실행 |
+| Deep Sleep 웨이크업 GPIO | `GPIO_NUM_16` | `GPIO_NUM_8` |
+| `BOARD_NAME` 문자열 | "XIAO ESP32C6" | "nanoESP32-C6" |
 
 ---
 
@@ -366,11 +388,12 @@ timestamp,temperature_c,humidity_pct
 ### Deep Sleep 활성화 (배포 시)
 `.ino` 파일에서 주석 해제:
 ```cpp
-esp_sleep_enable_ext1_wakeup(BIT(GPIO_NUM_8), ESP_EXT1_WAKEUP_ALL_LOW);  // nano
+esp_sleep_enable_ext1_wakeup(BIT(BUTTON_WAKE_GPIO), ESP_EXT1_WAKEUP_ALL_LOW);  // 보드별 자동 선택
 esp_sleep_enable_timer_wakeup(SLEEP_INTERVAL_MIN * 60ULL * 1000000ULL);
 display.hibernate();
 esp_deep_sleep_start();
 ```
+> `BUTTON_WAKE_GPIO`는 `#ifdef`에 의해 XIAO는 `GPIO_NUM_16`, nano는 `GPIO_NUM_8`로 자동 설정됩니다.
 
 ---
 
@@ -431,6 +454,7 @@ esp_deep_sleep_start();
 
 | 날짜 | 내용 |
 |------|------|
+| 2026-07-21 | .ino 파일 2개 → 1개 통합 (`#ifdef`로 보드 선택), `HomeTempMonitor_nano.ino` 삭제, `.gitignore` 추가 |
 | 2026-07-21 | nanoESP32-C6 16MB Flash 커스텀 파티션 테이블 추가, 저장 용량 비교 정리 |
 | 2026-07-21 | nanoESP32-C6용 .ino 추가, RGB LED OFF 코드 추가, README 업데이트 |
 | 2026-07-21 | 버튼 핀 최우선 풀업 설정, 웨이크업 원인으로 WiFi 활성화 수정 |
