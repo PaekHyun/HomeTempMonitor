@@ -59,18 +59,17 @@ BAT            ────────  10000mAh Li-Po (+)
 ```
 nanoESP32-C6          부품
 ──────────────          ────
-GPIO0         ────────  EPD BUSY
-GPIO1         ────────  EPD DC
-GPIO2         ────────  SPI SCK  ──── EPD SCK (CLK)
-GPIO3         ────────  SPI MISO (EPD 미사용, 예약)
+GPIO0         ────────  EPD RST
+GPIO1         ────────  EPD BUSY
 GPIO4         ────────  SPI MOSI ──── EPD DIN (MOSI)
-GPIO5         ────────  EPD CS
-GPIO6         ────────  I2C SDA  ──┬── SHT40 SDA
-GPIO7         ────────  I2C SCL  ──┼── DS3231 SDA
+GPIO5         ────────  SPI SCK  ──── EPD SCK (CLK)
+GPIO6         ────────  EPD CS
+GPIO7         ────────  EPD DC
+GPIO22        ────────  I2C SDA  ──┬── SHT40 SDA
+GPIO23        ────────  I2C SCL  ──┼── DS3231 SDA
                                    ├── SHT40 SCL
                                    └── DS3231 SCL
 GPIO8         ────────  버튼 (WiFi 트리거) ⚠️ RGB LED와 공유
-GPIO9         ────────  EPD RST
 3V3           ────────  모든 모듈 VCC
 GND           ────────  모든 모듈 GND
 ```
@@ -79,15 +78,15 @@ GND           ────────  모든 모듈 GND
 
 | 기능 | XIAO ESP32C6 | nanoESP32-C6 |
 |------|-------------|-------------|
-| I2C SDA | GPIO22 (D4) | **GPIO6** |
-| I2C SCL | GPIO23 (D5) | **GPIO7** |
-| SPI SCK | GPIO19 (D8) | **GPIO2** |
-| SPI MISO | GPIO20 (D9) | **GPIO3** |
+| I2C SDA | GPIO22 (D4) | **GPIO22** |
+| I2C SCL | GPIO23 (D5) | **GPIO23** |
+| SPI SCK | GPIO19 (D8) | **GPIO5** |
+| SPI MISO | GPIO20 (D9) | 미사용 |
 | SPI MOSI | GPIO18 (D10) | **GPIO4** |
-| EPD CS | GPIO21 (D3) | **GPIO5** |
-| EPD DC | GPIO1 (D1) | GPIO1 (동일) |
-| EPD RST | GPIO2 (D2) | **GPIO9** |
-| EPD BUSY | GPIO0 (D0) | GPIO0 (동일) |
+| EPD CS | GPIO21 (D3) | **GPIO6** |
+| EPD DC | GPIO1 (D1) | **GPIO7** |
+| EPD RST | GPIO2 (D2) | **GPIO0** |
+| EPD BUSY | GPIO0 (D0) | **GPIO1** |
 | 버튼 | GPIO16 (D6) | **GPIO8** ⚠️ |
 | Deep Sleep 웨이크업 | `BIT(GPIO_NUM_16)` | `BIT(GPIO_NUM_8)` |
 
@@ -140,7 +139,7 @@ HomeTempMonitor/
 
 | 항목 | XIAO | nano |
 |------|------|------|
-| 핀 정의 (SPI, I2C, EPD, Button) | GPIO19/20/18, 22/23, 21, 16 | GPIO2/3/4, 6/7, 5, 8 |
+| 핀 정의 (SPI, I2C, EPD, Button) | GPIO19/20/18, 22/23, 21, 16 | GPIO5/4, 22/23, 6/7/0/1, 8 |
 | `Adafruit_NeoPixel` include | ❌ 제외 | ✅ 포함 |
 | `rgbLED` 객체 생성 | ❌ 없음 | ✅ 생성 |
 | `setup()` RGB LED 끄기 | ❌ 스킵 | ✅ 실행 |
@@ -373,13 +372,13 @@ timestamp,temperature_c,humidity_pct
 ╚══════════════════════════════════════════╝
 [RGB] LED turned OFF (GPIO8 shared with button)
 [SETUP] Step 1: I2C + Sensors...
-[I2C]  SDA=GPIO6, SCL=GPIO7
+[I2C]  SDA=GPIO22, SCL=GPIO23
 [RTC] 2026-07-21 14:55:00
 [SHT40] Temp: 24.5 C | Hum: 45.2 %
 [SETUP] Step 2: LittleFS...
 [DataLogger] LittleFS mounted. Records: 0
 [SETUP] Step 3: SPI + E-Paper...
-[SPI]  SCK=GPIO2, MISO=GPIO3, MOSI=GPIO4
+[SPI]  SCK=GPIO5, MOSI=GPIO4, CS=GPIO6
 [EPD] 2.9" BWR initialized (portrait 128x296).
 [SETUP] Step 5: Button GPIO8=released, wokeByButton=no
 [SETUP] → Starting WiFi & Web server...
@@ -454,6 +453,7 @@ esp_deep_sleep_start();
 
 | 날짜 | 내용 |
 |------|------|
+| 2026-07-27 | E-Paper 핀맵 수정 — Calendar 작동 코드 기준 반영 (CS=6, DC=7, RST=0, BUSY=1, SCK=5), SPI.begin() CS 핀 추가, reset_ms 50→5 |
 | 2026-07-21 | .ino 파일 2개 → 1개 통합 (`#ifdef`로 보드 선택), `HomeTempMonitor_nano.ino` 삭제, `.gitignore` 추가 |
 | 2026-07-21 | nanoESP32-C6 16MB Flash 커스텀 파티션 테이블 추가, 저장 용량 비교 정리 |
 | 2026-07-21 | nanoESP32-C6용 .ino 추가, RGB LED OFF 코드 추가, README 업데이트 |
