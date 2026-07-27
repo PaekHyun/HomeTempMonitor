@@ -40,8 +40,8 @@
 
 // ===================== BOARD SELECTION =====================
 // ✏️ 사용할 보드를 하나만 #define 하세요. 나머지는 주석 처리!
-#define BOARD_XIAO_ESP32C6
-// #define BOARD_NANO_ESP32C6
+// #define BOARD_XIAO_ESP32C6
+#define BOARD_NANO_ESP32C6
 
 // ── 보드별 유효성 검사 ──
 #if !defined(BOARD_XIAO_ESP32C6) && !defined(BOARD_NANO_ESP32C6)
@@ -52,7 +52,7 @@
 #endif
 
 // ===================== INCLUDES =====================
-#include <GxEPD2_3C.h>
+#include <GxEPD2_4C.h>
 #include <Fonts/FreeSansBold9pt7b.h>
 #include <Fonts/FreeSansBold12pt7b.h>
 #include <Fonts/FreeSansBold18pt7b.h>
@@ -79,8 +79,8 @@
 #define TIMEZONE_OFFSET_HR       9       // KST = UTC+9
 
 // WiFi credentials
-#define WIFI_SSID                "your_wifi_ssid"
-#define WIFI_PASSWORD            "your_wifi_password"
+#define WIFI_SSID                "darmi"
+#define WIFI_PASSWORD            "rkdmf800412"
 
 // ===================== PIN DEFINITIONS =====================
 // ┌─────────────────────────────────────────────────────────────────────┐
@@ -133,10 +133,12 @@
 
 // ===================== DISPLAY OBJECT =====================
 // 2.9" BWR (3-color): GDEM029C90, 128x296, SSD1680
-GxEPD2_3C<GxEPD2_290_C90c, GxEPD2_290_C90c::HEIGHT> display(
-  GxEPD2_290_C90c(PIN_EPD_CS, PIN_EPD_DC, PIN_EPD_RST, PIN_EPD_BUSY)
+// GxEPD2_3C<GxEPD2_290_C90c, GxEPD2_290_C90c::HEIGHT> display(
+//   GxEPD2_290_C90c(PIN_EPD_CS, PIN_EPD_DC, PIN_EPD_RST, PIN_EPD_BUSY)
+// );
+GxEPD2_4C<GxEPD2_290c_GDEY029F51H, GxEPD2_290c_GDEY029F51H::HEIGHT> display(
+  GxEPD2_290c_GDEY029F51H(PIN_EPD_CS, PIN_EPD_DC, PIN_EPD_RST, PIN_EPD_BUSY)
 );
-
 // ===================== SENSOR & PERIPHERAL OBJECTS =====================
 Adafruit_SHT4x  sht4;
 DataLogger       logger;
@@ -239,6 +241,20 @@ void setup() {
   Serial.printf("[SETUP] Step 6: WiFi check — forceWebServer=%d, button=%d, needSync=%d, bootCount=%lu\n",
     (int)forceWebServer, (int)buttonPressed, (int)needWifiSync, bootCount);
 
+
+
+  if (forceWebServer || buttonPressed || wokeByButton || needWifiSync || bootCount == 1) {
+    forceWebServer = false;  // 1회만
+    Serial.println("[SETUP] → Starting WiFi & Web server...");
+    startWifiAndSync();
+
+    // WiFi 작업(IP/AP 안내 화면) 끝난 뒤 온습도 화면으로 복귀
+    Serial.println("[SETUP] → WiFi work done, restoring temp/humidity display...");
+    updateDisplay();
+  } else {
+    Serial.println("[SETUP] → WiFi skipped (not needed this cycle).");
+  }
+  /*
   if (forceWebServer || buttonPressed || wokeByButton || needWifiSync || bootCount == 1) {
     forceWebServer = false;  // 1회만
     Serial.println("[SETUP] → Starting WiFi & Web server...");
@@ -246,6 +262,9 @@ void setup() {
   } else {
     Serial.println("[SETUP] → WiFi skipped (not needed this cycle).");
   }
+*/
+
+
 
   // ── Step 7: Deep Sleep ──
   Serial.println("[SETUP] Step 7: Deep sleep DISABLED for debugging");
@@ -268,7 +287,8 @@ void setup() {
 void loop() {
   // Deep sleep 비활성화 시 디버그용 루프
   static unsigned long lastReadMs = 0;
-  if (millis() - lastReadMs >= 10000) {  // 10초마다 재측정
+  // if (millis() - lastReadMs >= 10000) {  // 10초마다 재측정
+  if (millis() - lastReadMs >= 300000) {  // 10초마다 재측정
     lastReadMs = millis();
     Serial.println("\n--- loop() periodic read ---");
     readSensorData();
@@ -511,6 +531,43 @@ void showIPInfo(IPAddress ip) {
   display.firstPage();
   do {
     display.fillScreen(GxEPD_WHITE);
+
+    display.setFont(&FreeSansBold18pt7b);
+    display.setTextColor(GxEPD_BLACK);
+    display.setCursor(6, 40);
+    display.print("WiFi");
+    display.setCursor(6, 70);
+    display.print("Connected!");
+
+    drawHLine(0, 82, 168, 3);
+
+    display.setFont(&FreeSansBold12pt7b);
+    display.setCursor(6, 112);
+    display.print("Open browser:");
+
+    display.setFont(&FreeSansBold18pt7b);
+    display.setCursor(6, 148);
+    display.printf("http://");
+    display.setCursor(6, 180);
+    display.print(ip.toString().c_str());
+
+    drawHLine(0, 196, 168, 1);
+
+    display.setFont(&FreeSansBold12pt7b);
+    display.setCursor(6, 224);
+    display.printf("Timeout: %d sec", WIFI_AP_TIMEOUT_SEC);
+
+    display.setCursor(6, 254);
+    display.print("Download CSV now!");
+  } while (display.nextPage());
+}
+
+/*
+void showIPInfo(IPAddress ip) {
+  display.setFullWindow();
+  display.firstPage();
+  do {
+    display.fillScreen(GxEPD_WHITE);
     display.setFont(&FreeSansBold12pt7b);
     display.setTextColor(GxEPD_BLACK);
     display.setCursor(4, 30);
@@ -529,7 +586,45 @@ void showIPInfo(IPAddress ip) {
     display.print("Download CSV now!");
   } while (display.nextPage());
 }
+*/
+void showAPInfo(IPAddress ip) {
+  display.setFullWindow();
+  display.firstPage();
+  do {
+    display.fillScreen(GxEPD_WHITE);
 
+    display.setFont(&FreeSansBold18pt7b);
+    display.setTextColor(GxEPD_RED);
+    display.setCursor(6, 40);
+    display.print("WiFi AP");
+    display.setCursor(6, 70);
+    display.print("Mode");
+
+    drawHLine(0, 82, 168, 3);
+
+    display.setFont(&FreeSansBold12pt7b);
+    display.setTextColor(GxEPD_BLACK);
+    display.setCursor(6, 112);
+    display.print("1. Connect WiFi:");
+
+    display.setFont(&FreeSansBold18pt7b);
+    display.setCursor(6, 148);
+    display.print(WIFI_AP_SSID);
+
+    drawHLine(0, 164, 168, 1);
+
+    display.setFont(&FreeSansBold12pt7b);
+    display.setCursor(6, 196);
+    display.print("2. Open browser:");
+
+    display.setFont(&FreeSansBold18pt7b);
+    display.setCursor(6, 232);
+    display.printf("http://");
+    display.setCursor(6, 264);
+    display.print(ip.toString().c_str());
+  } while (display.nextPage());
+}
+/*
 void showAPInfo(IPAddress ip) {
   display.setFullWindow();
   display.firstPage();
@@ -555,7 +650,7 @@ void showAPInfo(IPAddress ip) {
     display.printf("http://%s", ip.toString().c_str());
   } while (display.nextPage());
 }
-
+*/
 // ===================== E-PAPER DISPLAY =====================
 void initEPD() {
   // 작동하는 Calendar 코드 기준: reset_ms=5 (50은 너무 김)
@@ -577,6 +672,99 @@ void updateDisplay() {
 }
 
 void drawLayout() {
+  const int W = 168;
+
+  // ── Title ──
+  // display.setFont(&FreeSansBold18pt7b);
+  display.setFont(&FreeSansBold12pt7b);
+  display.setTextColor(GxEPD_BLACK);
+  display.setCursor(6, 30);
+  display.print("Home Climate");
+
+  drawHLine(0, 38, W, 3);
+
+  // ── Temperature Section ──
+  display.setFont(&FreeSansBold9pt7b);
+  display.setTextColor(GxEPD_RED);
+  display.setCursor(6, 64);
+  display.print("TEMPERATURE");
+  
+
+  display.setFont(&FreeSansBold24pt7b);
+  display.setTextColor(GxEPD_BLACK);
+  display.setCursor(10, 112);
+  if (!isnan(g_temperature)) {
+    display.printf("%.1f", g_temperature);
+  } else {
+    display.print("--.-");
+  }
+
+  display.setFont(&FreeSansBold12pt7b);
+  int16_t tx, ty; uint16_t tw, th;
+  display.getTextBounds("24.5", 10, 112, &tx, &ty, &tw, &th);
+  display.setCursor(10 + tw + 4, 100);
+  display.print("\xB0" "C");
+
+  display.setFont(&FreeSansBold9pt7b);
+  display.setTextColor(GxEPD_RED);
+  display.setCursor(6, 134);
+  if (rtcMinTemp < 900.0f && rtcMaxTemp > -900.0f) {
+    display.printf("%.1f~%.1f\xB0" "C", rtcMinTemp, rtcMaxTemp);
+  } else {
+    display.print("---");
+  }
+
+  drawHLine(0, 150, W, 1);
+
+  // ── Humidity Section ──
+  display.setFont(&FreeSansBold9pt7b);
+  display.setTextColor(GxEPD_BLACK);
+  display.setCursor(6, 172);
+  display.print("HUMIDITY");
+
+  display.setFont(&FreeSansBold24pt7b);
+  display.setCursor(10, 220);
+  if (!isnan(g_humidity)) {
+    display.printf("%.1f%%", g_humidity);
+  } else {
+    display.print("--.-%");
+  }
+
+  display.setFont(&FreeSansBold9pt7b);
+  display.setTextColor(GxEPD_BLACK);
+  display.setCursor(6, 242);
+  if (rtcMinHum < 900.0f && rtcMaxHum > -900.0f) {
+    display.printf("%.1f~%.1f%%", rtcMinHum, rtcMaxHum);
+  } else {
+    display.print("---");
+  }
+
+  // ── Bottom Info Section ──
+  drawHLine(0, 258, W, 2);
+
+  display.setFont(&FreeSansBold9pt7b);
+  display.setTextColor(GxEPD_BLACK);
+
+  display.setCursor(6, 280);
+  if (g_rtc_ok) {
+    display.printf("%02d-%02d %02d:%02d",
+      g_rtcNow.month, g_rtcNow.day, g_rtcNow.hour, g_rtcNow.minute);
+  } else {
+    display.print("RTC:FAIL");
+  }
+
+  display.setCursor(6, 302);
+  display.printf("SHT:%s Log:%s",
+    g_sht4_ok ? "OK" : "X",
+    g_logger_ok ? "OK" : "X");
+
+  display.setCursor(6, 324);
+  display.printf("#%lu %dmin ~%dd",
+    bootCount, SLEEP_INTERVAL_MIN, estimateBatteryDays());
+}
+
+
+/*void drawLayout() {
   // ── Title ──
   display.setFont(&FreeSansBold12pt7b);
   display.setTextColor(GxEPD_BLACK);
@@ -663,7 +851,7 @@ void drawLayout() {
   display.printf("#%lu %dmin ~%dd",
     bootCount, SLEEP_INTERVAL_MIN, estimateBatteryDays());
 }
-
+*/
 // ===================== UTILITY FUNCTIONS =====================
 int estimateBatteryDays() {
   const float I_SLEEP_MA   = 0.015f;
