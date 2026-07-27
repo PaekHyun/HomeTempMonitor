@@ -88,16 +88,9 @@
 // ├──────────┬──────────────────┬──────────────────┬───────────────────┤
 // │  기능     │  XIAO ESP32C6    │  nanoESP32-C6    │  비고             │
 // ├──────────┼──────────────────┼──────────────────┼───────────────────┤
-// │  SPI SCK │  GPIO19 (D8)     │  GPIO2  (D2)     │                  │
-// │  SPI MISO│  GPIO20 (D9)     │  GPIO3  (D3)     │ EPD 미사용        │
-// │  SPI MOSI│  GPIO18 (D10)    │  GPIO4  (D4)     │                  │
-// │  EPD CS  │  GPIO21 (D3)     │  GPIO5  (D5)     │                  │
-// │  EPD DC  │  GPIO1  (D1)     │  GPIO1  (D1)     │ 동일              │
-// │  EPD RST │  GPIO2  (D2)     │  GPIO9  (D9)     │                  │
-// │  EPD BUSY│  GPIO0  (D0)     │  GPIO0  (D0)     │ 동일              │
-// │  I2C SDA │  GPIO22 (D4)     │  GPIO6  (D6)     │                  │
-// │  I2C SCL │  GPIO23 (D5)     │  GPIO7  (D7)     │                  │
-// │  Button  │  GPIO16 (D6)     │  GPIO8  (D8)     │ ⚠️ nano: RGB공유  │
+// │  SPI SCK │  GPIO19 (D8)     │  GPIO5  (D5)     │  EPD CLK          │
+// │  SPI MISO│  GPIO20 (D9)     │  (미사용)         │  EPD 미사용        │
+// │  SPI MOSI│  GPIO18 (D10)    │  GPIO4  (D4)     │  E [생략됨:과거호출축약 원문 727자 — 이 축약본을 파일 내용/코드로 재사용 금지]
 // └──────────┴──────────────────┴──────────────────┴───────────────────┘
 
 #ifdef BOARD_XIAO_ESP32C6
@@ -116,17 +109,18 @@
   #define BUTTON_WAKE_GPIO GPIO_NUM_16
 #elif defined(BOARD_NANO_ESP32C6)
   // ── nanoESP32-C6 핀 정의 ──
-  #define PIN_SPI_SCK      2   // D2  (GPIO2)
-  #define PIN_SPI_MISO     3   // D3  (GPIO3) — EPD 미사용, 예약
-  #define PIN_SPI_MOSI     4   // D4  (GPIO4)
-  #define PIN_EPD_CS       5   // D5  (GPIO5)
-  #define PIN_EPD_DC       1   // D1  (GPIO1)
-  #define PIN_EPD_RST      9   // D9  (GPIO9)
-  #define PIN_EPD_BUSY     0   // D0  (GPIO0)
-  #define PIN_I2C_SDA      6   // D6  (GPIO6)
-  #define PIN_I2C_SCL      7   // D7  (GPIO7)
-  #define PIN_BUTTON       8   // D8  (GPIO8) — LOW = pressed
-  #define PIN_RGB_LED      8   // GPIO8 (WS2812, 버튼과 공유)
+  // (TodayGoogleCalendar 작동 코드 기준, WeAct 3.7" e-paper 보드 직접 연결)
+  #define PIN_SPI_SCK      5   // GPIO5  → EPD CLK (SCK)
+  #define PIN_SPI_MISO    -1   // EPD 미사용 (MISO 없음)
+  #define PIN_SPI_MOSI     4   // GPIO4  → EPD DIN (MOSI/SDA)
+  #define PIN_EPD_CS       6   // GPIO6  → EPD CS
+  #define PIN_EPD_DC       7   // GPIO7  → EPD DC
+  #define PIN_EPD_RST      0   // GPIO0  → EPD RST (RES)
+  #define PIN_EPD_BUSY     1   // GPIO1  → EPD BUSY
+  #define PIN_I2C_SDA     22   // GPIO22 → I2C SDA (SHT40)
+  #define PIN_I2C_SCL     23   // GPIO23 → I2C SCL (SHT40)
+  #define PIN_BUTTON       8   // GPIO8  → 버튼 (LOW = pressed)
+  #define PIN_RGB_LED      8   // GPIO8  (WS2812, 버튼과 공유)
   #define NUM_RGB_LEDS     1
   #define BOARD_NAME      "nanoESP32-C6"
   #define BUTTON_WAKE_GPIO GPIO_NUM_8
@@ -219,9 +213,10 @@ void setup() {
 
   // ── Step 3: SPI + E-Paper ──
   Serial.println("[SETUP] Step 3: SPI + E-Paper...");
-  SPI.begin(PIN_SPI_SCK, PIN_SPI_MISO, PIN_SPI_MOSI);
-  Serial.printf("[SPI]  SCK=GPIO%d, MISO=GPIO%d, MOSI=GPIO%d\n",
-    PIN_SPI_SCK, PIN_SPI_MISO, PIN_SPI_MOSI);
+  // 작동하는 Calendar 코드 기준: SPI.begin(SCK, MISO(-1), MOSI, CS)
+  SPI.begin(PIN_SPI_SCK, -1, PIN_SPI_MOSI, PIN_EPD_CS);
+  Serial.printf("[SPI]  SCK=GPIO%d, MOSI=GPIO%d, CS=GPIO%d\n",
+    PIN_SPI_SCK, PIN_SPI_MOSI, PIN_EPD_CS);
   initEPD();
   updateDisplay();
 
@@ -563,7 +558,8 @@ void showAPInfo(IPAddress ip) {
 
 // ===================== E-PAPER DISPLAY =====================
 void initEPD() {
-  display.init(SERIAL_BAUD, true, 50, false);
+  // 작동하는 Calendar 코드 기준: reset_ms=5 (50은 너무 김)
+  display.init(115200, true, 5, false);
   display.setRotation(0); // Portrait: 128 x 296
   Serial.println("[EPD] 2.9\" BWR initialized (portrait 128x296).");
 }
