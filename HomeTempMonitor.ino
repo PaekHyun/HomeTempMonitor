@@ -79,8 +79,8 @@
 #define TIMEZONE_OFFSET_HR       9       // KST = UTC+9
 
 // WiFi credentials
-#define WIFI_SSID                "ssid"
-#define WIFI_PASSWORD            "password"
+#define WIFI_SSID                "darmi"
+#define WIFI_PASSWORD            "rkdmf800412"
 
 // ===================== PIN DEFINITIONS =====================
 // ┌──────────┬──────────────────┬──────────────────┬───────────────────┐
@@ -519,28 +519,31 @@ void showIPInfo(IPAddress ip) {
   do {
     display.fillScreen(GxEPD_WHITE);
 
-    display.setFont(&FreeSansBold18pt7b);
+    display.setFont(&FreeSansBold18pt7b);    
     display.setTextColor(GxEPD_BLACK);
     display.setCursor(6, 40);
     display.print("WiFi");
+
+    display.setFont(&FreeSansBold12pt7b);
     display.setCursor(6, 70);
     display.print("Connected!");
 
     drawHLine(0, 82, 168, 3);
 
-    display.setFont(&FreeSansBold12pt7b);
+    display.setFont(&FreeSansBold9pt7b);
     display.setCursor(6, 112);
     display.print("Open browser:");
 
-    display.setFont(&FreeSansBold18pt7b);
+    // display.setFont(&FreeSansBold18pt7b);
+    display.setFont(&FreeSansBold12pt7b);
     display.setCursor(6, 148);
     display.printf("http://");
     display.setCursor(6, 180);
     display.print(ip.toString().c_str());
 
-    drawHLine(0, 196, 168, 1);
+    drawHLine(0, 196, 168, 2);
 
-    display.setFont(&FreeSansBold12pt7b);
+    display.setFont(&FreeSansBold9pt7b);
     display.setCursor(6, 224);
     display.printf("Timeout: %d sec", WIFI_AP_TIMEOUT_SEC);
 
@@ -655,10 +658,12 @@ void drawLayout() {
   }
 
   // °C 표시
-  display.setFont(&FreeSansBold12pt7b);
+  // display.setFont(&FreeSansBold12pt7b);
+  display.setFont(&FreeSansBold24pt7b);
   int16_t tx, ty; uint16_t tw, th;
   display.getTextBounds("24.5", 10, 102, &tx, &ty, &tw, &th);
-  display.setCursor(10 + tw + 4, 90);
+  // display.setCursor(10 + tw + 4, 90);
+  display.setCursor(10 + tw + 4, 102);
   display.print("\xB0" "C");
 
   // Min/Max (빨강)
