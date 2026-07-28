@@ -1,13 +1,13 @@
 /*
  * ═══════════════════════════════════════════════════════════════
  *  Home Temperature & Humidity Monitor
- *  ESP32-C6 + SHT40 + 2.9" E-Paper + DS3231
+ *  ESP32-C6 + SHT40 + 2.9" 4-Color E-Paper + DS3231
  *  (내장 플래시 LittleFS 저장)
  * ═══════════════════════════════════════════════════════════════
  *
  * Features:
  *  ✅ SHT40 sensor → temperature & humidity (I2C)
- *  ✅ 2.9" BWR e-paper → real-time display (SPI, SSD1680)
+ *  ✅ 2.9" BWRY e-paper → 4-color display (SPI, JD79667, 168×384)
  *  ✅ 내장 플래시 LittleFS → CSV 데이터 저장
  *  ✅ DS3231 RTC → 정확한 타임스탬프 (I2C)
  *  ✅ WiFi NTP → 24시간마다 시간 동기화
@@ -16,6 +16,7 @@
  *  ✅ WiFi AP 모드 → 공유기 없이도 직접 접속 가능
  *  ✅ Deep sleep → 초저전력 (~15uA)
  *  ✅ Min/Max 추적 (RTC 메모리 유지)
+ *  ✅ 4색 활용 → Black/White/Red/Yellow
  *
  * Board Selection:
  *  아래 BOARD_SELECT 중 하나만 #define 하세요.
@@ -43,7 +44,6 @@
 // #define BOARD_XIAO_ESP32C6
 #define BOARD_NANO_ESP32C6
 
-// ── 보드별 유효성 검사 ──
 #if !defined(BOARD_XIAO_ESP32C6) && !defined(BOARD_NANO_ESP32C6)
   #error "BOARD_XIAO_ESP32C6 또는 BOARD_NANO_ESP32C6 중 하나를 #define 하세요!"
 #endif
@@ -83,44 +83,46 @@
 #define WIFI_PASSWORD            "password"
 
 // ===================== PIN DEFINITIONS =====================
-// ┌─────────────────────────────────────────────────────────────────────┐
-// │  핀맵 비교                                                          │
-// ├──────────┬──────────────────┬──────────────────┬───────────────────┤
+// ┌──────────┬──────────────────┬──────────────────┬───────────────────┐
 // │  기능     │  XIAO ESP32C6    │  nanoESP32-C6    │  비고             │
 // ├──────────┼──────────────────┼──────────────────┼───────────────────┤
 // │  SPI SCK │  GPIO19 (D8)     │  GPIO5  (D5)     │  EPD CLK          │
 // │  SPI MISO│  GPIO20 (D9)     │  (미사용)         │  EPD 미사용        │
-// │  SPI MOSI│  GPIO18 (D10)    │  GPIO4  (D4)     │  E [생략됨:과거호출축약 원문 727자 — 이 축약본을 파일 내용/코드로 재사용 금지]
+// │  SPI MOSI│  GPIO18 (D10)    │  GPIO4  (D4)     │  EPD DIN          │
+// │  EPD CS  │  GPIO21 (D3)     │  GPIO6  (D6)     │                   │
+// │  EPD DC  │  GPIO1  (D1)     │  GPIO7  (D7)     │                   │
+// │  EPD RST │  GPIO2  (D2)     │  GPIO0  (D0)     │                   │
+// │  EPD BUSY│  GPIO0  (D0)     │  GPIO1  (D1)     │                   │
+// │  I2C SDA │  GPIO22 (D4)     │  GPIO22          │  SHT40 + DS3231   │
+// │  I2C SCL │  GPIO23 (D5)     │  GPIO23          │  SHT40 + DS3231   │
+// │  Button  │  GPIO16 (D6)     │  GPIO8  (D8)     │  LOW = pressed    │
 // └──────────┴──────────────────┴──────────────────┴───────────────────┘
 
 #ifdef BOARD_XIAO_ESP32C6
-  // ── XIAO ESP32C6 핀 정의 ──
-  #define PIN_SPI_SCK     19   // D8
-  #define PIN_SPI_MISO    20   // D9  (EPD 미사용, 예약)
-  #define PIN_SPI_MOSI    18   // D10
-  #define PIN_EPD_CS      21   // D3
-  #define PIN_EPD_DC       1   // D1
-  #define PIN_EPD_RST      2   // D2
-  #define PIN_EPD_BUSY     0   // D0
-  #define PIN_I2C_SDA     22   // D4
-  #define PIN_I2C_SCL     23   // D5
-  #define PIN_BUTTON      16   // D6 (GPIO16) — LOW = pressed
+  #define PIN_SPI_SCK     19
+  #define PIN_SPI_MISO    20
+  #define PIN_SPI_MOSI    18
+  #define PIN_EPD_CS      21
+  #define PIN_EPD_DC       1
+  #define PIN_EPD_RST      2
+  #define PIN_EPD_BUSY     0
+  #define PIN_I2C_SDA     22
+  #define PIN_I2C_SCL     23
+  #define PIN_BUTTON      16
   #define BOARD_NAME      "XIAO ESP32C6"
   #define BUTTON_WAKE_GPIO GPIO_NUM_16
 #elif defined(BOARD_NANO_ESP32C6)
-  // ── nanoESP32-C6 핀 정의 ──
-  // (TodayGoogleCalendar 작동 코드 기준, WeAct 3.7" e-paper 보드 직접 연결)
-  #define PIN_SPI_SCK      5   // GPIO5  → EPD CLK (SCK)
-  #define PIN_SPI_MISO    -1   // EPD 미사용 (MISO 없음)
-  #define PIN_SPI_MOSI     4   // GPIO4  → EPD DIN (MOSI/SDA)
-  #define PIN_EPD_CS       6   // GPIO6  → EPD CS
-  #define PIN_EPD_DC       7   // GPIO7  → EPD DC
-  #define PIN_EPD_RST      0   // GPIO0  → EPD RST (RES)
-  #define PIN_EPD_BUSY     1   // GPIO1  → EPD BUSY
-  #define PIN_I2C_SDA     22   // GPIO22 → I2C SDA (SHT40)
-  #define PIN_I2C_SCL     23   // GPIO23 → I2C SCL (SHT40)
-  #define PIN_BUTTON       8   // GPIO8  → 버튼 (LOW = pressed)
-  #define PIN_RGB_LED      8   // GPIO8  (WS2812, 버튼과 공유)
+  #define PIN_SPI_SCK      5
+  #define PIN_SPI_MISO    -1
+  #define PIN_SPI_MOSI     4
+  #define PIN_EPD_CS       6
+  #define PIN_EPD_DC       7
+  #define PIN_EPD_RST      0
+  #define PIN_EPD_BUSY     1
+  #define PIN_I2C_SDA     22
+  #define PIN_I2C_SCL     23
+  #define PIN_BUTTON       8
+  #define PIN_RGB_LED      8
   #define NUM_RGB_LEDS     1
   #define BOARD_NAME      "nanoESP32-C6"
   #define BUTTON_WAKE_GPIO GPIO_NUM_8
@@ -132,13 +134,11 @@
 #endif
 
 // ===================== DISPLAY OBJECT =====================
-// 2.9" BWR (3-color): GDEM029C90, 128x296, SSD1680
-// GxEPD2_3C<GxEPD2_290_C90c, GxEPD2_290_C90c::HEIGHT> display(
-//   GxEPD2_290_C90c(PIN_EPD_CS, PIN_EPD_DC, PIN_EPD_RST, PIN_EPD_BUSY)
-// );
+// GDEY029F51H: 2.9" 4-color (BWRY), 168×384, JD79667
 GxEPD2_4C<GxEPD2_290c_GDEY029F51H, GxEPD2_290c_GDEY029F51H::HEIGHT> display(
   GxEPD2_290c_GDEY029F51H(PIN_EPD_CS, PIN_EPD_DC, PIN_EPD_RST, PIN_EPD_BUSY)
 );
+
 // ===================== SENSOR & PERIPHERAL OBJECTS =====================
 Adafruit_SHT4x  sht4;
 DataLogger       logger;
@@ -152,7 +152,7 @@ RTC_DATA_ATTR float    rtcMaxTemp      = -999.0f;
 RTC_DATA_ATTR float    rtcMinHum       = 999.0f;
 RTC_DATA_ATTR float    rtcMaxHum       = -999.0f;
 RTC_DATA_ATTR uint32_t lastWifiSyncBoot = 0;
-RTC_DATA_ATTR bool     forceWebServer  = false;  // 버튼 눌림 플래그
+RTC_DATA_ATTR bool     forceWebServer  = false;
 
 // ===================== GLOBAL VARIABLES =====================
 float    g_temperature = NAN;
@@ -163,30 +163,45 @@ bool     g_rtc_ok     = false;
 bool     g_wifi_ok    = false;
 DateTime g_rtcNow;
 
+// ===================== FORWARD DECLARATIONS =====================
+void initRTC();
+void syncRTCFromNTP();
+void initSHT40();
+void readSensorData();
+void updateMinMax();
+void initLogger();
+void logData();
+void initEPD();
+void updateDisplay();
+void drawLayout();
+void startWifiAndSync();
+void startAPMode();
+void handleAPRequest(WiFiClient &client);
+void runWebServer();
+void showIPInfo(IPAddress ip);
+void showAPInfo(IPAddress ip);
+int  estimateBatteryDays();
+void drawHLine(int x, int y, int w, int thickness);
+float calcHeatIndex(float tempC, float humidity);
+
 // ===================== SETUP =====================
 void setup() {
-  // ── nanoESP32-C6: RGB LED 끄기 (GPIO8 공유 → 버튼 충돌 방지) ──
-  // WS2812는 전원 인가 시 랜덤 색상이 표시될 수 있으므로
-  // 가장 먼저 꺼야 함 (전력 절약 + GPIO8 버튼 충돌 방지)
 #ifdef BOARD_NANO_ESP32C6
   rgbLED.begin();
-  rgbLED.setPixelColor(0, rgbLED.Color(0, 0, 0));  // 검정 = OFF
+  rgbLED.setPixelColor(0, rgbLED.Color(0, 0, 0));
   rgbLED.show();
-  pinMode(PIN_RGB_LED, INPUT);  // LED 핀을 입력으로 전환 → 버튼과 공유 핀 충돌 방지
+  pinMode(PIN_RGB_LED, INPUT);
   Serial.println("[RGB] LED turned OFF (GPIO8 shared with button)");
 #endif
 
-  // ── 버튼 핀 최우선 설정 (floating 방지) ──
-  // Deep Sleep 웨이크업 직후에도 안정적인 HIGH 보장
   pinMode(PIN_BUTTON, INPUT_PULLUP);
-  delay(1);  // 풀업 안정화 대기
+  delay(1);
 
   Serial.begin(SERIAL_BAUD);
   while (!Serial && millis() < 2000) delay(10);
 
   bootCount++;
 
-  // ── 웨이크업 원인 확인 ──
   esp_sleep_wakeup_cause_t wakeupReason = esp_sleep_get_wakeup_cause();
   const char* wakeupStr = "UNKNOWN";
   if (wakeupReason == ESP_SLEEP_WAKEUP_TIMER)  wakeupStr = "TIMER";
@@ -200,7 +215,7 @@ void setup() {
   Serial.printf ("║  Wakeup: %s\n", wakeupStr);
   Serial.println("╚══════════════════════════════════════════╝");
 
-  // ── Step 1: I2C Bus + Sensors ──
+  // Step 1: I2C + Sensors
   Serial.println("[SETUP] Step 1: I2C + Sensors...");
   Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
   Serial.printf("[I2C]  SDA=GPIO%d, SCL=GPIO%d\n", PIN_I2C_SDA, PIN_I2C_SCL);
@@ -209,67 +224,47 @@ void setup() {
   readSensorData();
   updateMinMax();
 
-  // ── Step 2: LittleFS (내장 플래시) ──
+  // Step 2: LittleFS
   Serial.println("[SETUP] Step 2: LittleFS...");
   initLogger();
 
-  // ── Step 3: SPI + E-Paper ──
+  // Step 3: SPI + E-Paper
   Serial.println("[SETUP] Step 3: SPI + E-Paper...");
-  // 작동하는 Calendar 코드 기준: SPI.begin(SCK, MISO(-1), MOSI, CS)
   SPI.begin(PIN_SPI_SCK, -1, PIN_SPI_MOSI, PIN_EPD_CS);
   Serial.printf("[SPI]  SCK=GPIO%d, MOSI=GPIO%d, CS=GPIO%d\n",
     PIN_SPI_SCK, PIN_SPI_MOSI, PIN_EPD_CS);
   initEPD();
   updateDisplay();
 
-  // ── Step 4: Log data ──
+  // Step 4: Log data
   Serial.println("[SETUP] Step 4: Log data...");
   logData();
 
-  // ── Step 5: 버튼 체크 (눌림 시 WiFi 즉시 활성화) ──
-  // 주의: 이미 setup() 최상단에서 pinMode(INPUT_PULLUP) 설정됨
+  // Step 5: 버튼 체크
   bool buttonPressed = (digitalRead(PIN_BUTTON) == LOW);
-  // 웨이크업 원인이 버튼이면 버튼을 뗐어도 WiFi 켜기
   bool wokeByButton = (wakeupReason == ESP_SLEEP_WAKEUP_EXT1);
   Serial.printf("[SETUP] Step 5: Button GPIO%d=%s, wokeByButton=%s\n",
     PIN_BUTTON, buttonPressed ? "PRESSED" : "released", wokeByButton ? "YES" : "no");
 
-  // ── Step 6: WiFi sync & Web server ──
+  // Step 6: WiFi sync & Web server
   bool needWifiSync = (bootCount - lastWifiSyncBoot) >=
                        ((uint32_t)WIFI_SYNC_INTERVAL_HR * 60 / SLEEP_INTERVAL_MIN);
 
   Serial.printf("[SETUP] Step 6: WiFi check — forceWebServer=%d, button=%d, needSync=%d, bootCount=%lu\n",
     (int)forceWebServer, (int)buttonPressed, (int)needWifiSync, bootCount);
 
-
-
   if (forceWebServer || buttonPressed || wokeByButton || needWifiSync || bootCount == 1) {
-    forceWebServer = false;  // 1회만
+    forceWebServer = false;
     Serial.println("[SETUP] → Starting WiFi & Web server...");
     startWifiAndSync();
-
-    // WiFi 작업(IP/AP 안내 화면) 끝난 뒤 온습도 화면으로 복귀
     Serial.println("[SETUP] → WiFi work done, restoring temp/humidity display...");
     updateDisplay();
   } else {
     Serial.println("[SETUP] → WiFi skipped (not needed this cycle).");
   }
-  /*
-  if (forceWebServer || buttonPressed || wokeByButton || needWifiSync || bootCount == 1) {
-    forceWebServer = false;  // 1회만
-    Serial.println("[SETUP] → Starting WiFi & Web server...");
-    startWifiAndSync();
-  } else {
-    Serial.println("[SETUP] → WiFi skipped (not needed this cycle).");
-  }
-*/
 
-
-
-  // ── Step 7: Deep Sleep ──
+  // Step 7: Deep Sleep (현재 비활성화, 디버그 모드)
   Serial.println("[SETUP] Step 7: Deep sleep DISABLED for debugging");
-  // ESP32C6는 ext0 미지원 → ext1 사용 (GPIO 비트마스크)
-  // 버튼 누름 시 웨이크업
   //esp_sleep_enable_ext1_wakeup(BIT(BUTTON_WAKE_GPIO), ESP_EXT1_WAKEUP_ALL_LOW);
   //esp_sleep_enable_timer_wakeup(SLEEP_INTERVAL_MIN * 60ULL * 1000000ULL);
 
@@ -285,10 +280,8 @@ void setup() {
 }
 
 void loop() {
-  // Deep sleep 비활성화 시 디버그용 루프
   static unsigned long lastReadMs = 0;
-  // if (millis() - lastReadMs >= 10000) {  // 10초마다 재측정
-  if (millis() - lastReadMs >= 300000) {  // 10초마다 재측정
+  if (millis() - lastReadMs >= 300000) {  // 5분마다 재측정
     lastReadMs = millis();
     Serial.println("\n--- loop() periodic read ---");
     readSensorData();
@@ -346,7 +339,6 @@ void syncRTCFromNTP() {
 
 // ===================== SHT40 FUNCTIONS =====================
 void initSHT40() {
-  // SHT40 기본 주소: 0x44. 대체 주소: 0x45
   if (!sht4.begin(&Wire)) {
     Serial.println("[SHT40] Not found at 0x44! Trying 0x45...");
     Wire.beginTransmission(0x45);
@@ -419,7 +411,6 @@ void logData() {
 
 // ===================== WIFI & WEB SERVER =====================
 void startWifiAndSync() {
-  // ── 먼저 공유기(Station) 모드 시도 ──
   Serial.println("[WiFi] Trying Station mode (공유기 연결)...");
 
   webServer.onTimeSync([]() {
@@ -429,12 +420,10 @@ void startWifiAndSync() {
   webServer.start(WIFI_SSID, WIFI_PASSWORD);
 
   if (webServer.isRunning()) {
-    // 공유기 연결 성공 → NTP 동기화 + 웹서버
     g_wifi_ok = true;
     lastWifiSyncBoot = bootCount;
     runWebServer();
   } else {
-    // 공유기 연결 실패 → AP 모드로 전환 (직접 접속)
     Serial.println("[WiFi] Station failed. Starting AP mode...");
     startAPMode();
   }
@@ -442,17 +431,15 @@ void startWifiAndSync() {
 
 void startAPMode() {
   WiFi.mode(WIFI_AP);
-  WiFi.softAP(WIFI_AP_SSID);  // 개방형 AP (비번 없음)
+  WiFi.softAP(WIFI_AP_SSID);
 
   IPAddress apIP = WiFi.softAPIP();
   Serial.printf("[WiFi AP] SSID: \"%s\"\n", WIFI_AP_SSID);
   Serial.printf("[WiFi AP] Connect to WiFi \"%s\" then open http://%s\n",
     WIFI_AP_SSID, apIP.toString().c_str());
 
-  // E-Paper에 AP 정보 표시
   showAPInfo(apIP);
 
-  // 간이 웹서버 시작
   WiFiServer apServer(80);
   apServer.begin();
 
@@ -513,7 +500,6 @@ void runWebServer() {
   Serial.printf("[WebServer] Active for %d seconds. Connect to download CSV.\n",
     WIFI_AP_TIMEOUT_SEC);
 
-  // E-Paper에 IP 표시
   showIPInfo(WiFi.localIP());
 
   unsigned long startMs = millis();
@@ -526,6 +512,7 @@ void runWebServer() {
   Serial.println("[WebServer] Timeout. WiFi disconnected.");
 }
 
+// ===================== E-PAPER INFO SCREENS =====================
 void showIPInfo(IPAddress ip) {
   display.setFullWindow();
   display.firstPage();
@@ -562,31 +549,6 @@ void showIPInfo(IPAddress ip) {
   } while (display.nextPage());
 }
 
-/*
-void showIPInfo(IPAddress ip) {
-  display.setFullWindow();
-  display.firstPage();
-  do {
-    display.fillScreen(GxEPD_WHITE);
-    display.setFont(&FreeSansBold12pt7b);
-    display.setTextColor(GxEPD_BLACK);
-    display.setCursor(4, 30);
-    display.print("WiFi Connected!");
-    drawHLine(0, 36, 128, 2);
-    display.setFont(&FreeSansBold9pt7b);
-    display.setCursor(4, 56);
-    display.print("Open browser:");
-    display.setFont(&FreeSansBold12pt7b);
-    display.setCursor(4, 78);
-    display.printf("http://%s", ip.toString().c_str());
-    display.setFont(&FreeSansBold9pt7b);
-    display.setCursor(4, 100);
-    display.printf("Timeout: %d sec", WIFI_AP_TIMEOUT_SEC);
-    display.setCursor(4, 120);
-    display.print("Download CSV now!");
-  } while (display.nextPage());
-}
-*/
 void showAPInfo(IPAddress ip) {
   display.setFullWindow();
   display.firstPage();
@@ -624,234 +586,181 @@ void showAPInfo(IPAddress ip) {
     display.print(ip.toString().c_str());
   } while (display.nextPage());
 }
-/*
-void showAPInfo(IPAddress ip) {
-  display.setFullWindow();
-  display.firstPage();
-  do {
-    display.fillScreen(GxEPD_WHITE);
-    display.setFont(&FreeSansBold12pt7b);
-    display.setTextColor(GxEPD_RED);
-    display.setCursor(4, 30);
-    display.print("WiFi AP Mode");
-    drawHLine(0, 36, 128, 2);
-    display.setFont(&FreeSansBold9pt7b);
-    display.setTextColor(GxEPD_BLACK);
-    display.setCursor(4, 56);
-    display.print("1. Connect WiFi:");
-    display.setFont(&FreeSansBold12pt7b);
-    display.setCursor(4, 78);
-    display.print(WIFI_AP_SSID);
-    display.setFont(&FreeSansBold9pt7b);
-    display.setCursor(4, 98);
-    display.print("2. Open browser:");
-    display.setFont(&FreeSansBold12pt7b);
-    display.setCursor(4, 120);
-    display.printf("http://%s", ip.toString().c_str());
-  } while (display.nextPage());
-}
-*/
+
 // ===================== E-PAPER DISPLAY =====================
 void initEPD() {
-  // 작동하는 Calendar 코드 기준: reset_ms=5 (50은 너무 김)
   display.init(115200, true, 5, false);
-  display.setRotation(0); // Portrait: 128 x 296
-  Serial.println("[EPD] 2.9\" BWR initialized (portrait 128x296).");
+  display.setRotation(0); // Portrait: 168 × 384
+  Serial.println("[EPD] 2.9\" 4-color (BWRY) initialized (portrait 168x384).");
 }
 
 void updateDisplay() {
   display.setFullWindow();
-
   display.firstPage();
   do {
     display.fillScreen(GxEPD_WHITE);
     drawLayout();
   } while (display.nextPage());
-
   Serial.println("[EPD] Display updated.");
 }
 
+// ── 체감온도 계산 (Heat Index, Steadman 공식) ──
+float calcHeatIndex(float tempC, float humidity) {
+  if (isnan(tempC) || isnan(humidity)) return NAN;
+  if (tempC < 27.0f) return tempC;  // 27°C 미만은 보정 불필요
+  float T = tempC;
+  float R = humidity;
+  float HI = 0.5f * (T + 61.0f + ((T - 68.0f) * 1.2f) + (R * 0.094f));
+  // Rothfusz 회귀 (HI >= 80°F ≈ 26.7°C)
+  if (HI > 26.7f) {
+    float F = T * 9.0f / 5.0f + 32.0f;
+    HI = -42.379f + 2.04901523f*F + 10.14333127f*R
+         - 0.22475541f*F*R - 0.00683783f*F*F
+         - 0.05481717f*R*R + 0.00122874f*F*F*R
+         + 0.00085282f*F*R*R - 0.00000199f*F*F*R*R;
+    HI = (HI - 32.0f) * 5.0f / 9.0f;  // °F → °C
+  }
+  return HI;
+}
+
+// ── 메인 레이아웃 (168 × 384 전체 활용, 4색 BWRY) ──
 void drawLayout() {
   const int W = 168;
 
-  // ── Title ──
-  // display.setFont(&FreeSansBold18pt7b);
+  // ══════════════════════════════════════════
+  //  Title Section (y: 0 ~ 38)
+  // ══════════════════════════════════════════
   display.setFont(&FreeSansBold12pt7b);
   display.setTextColor(GxEPD_BLACK);
-  display.setCursor(6, 30);
+  display.setCursor(6, 28);
   display.print("Home Climate");
 
-  drawHLine(0, 38, W, 3);
+  drawHLine(0, 36, W, 3);
 
-  // ── Temperature Section ──
+  // ══════════════════════════════════════════
+  //  Temperature Section (y: 36 ~ 170)
+  // ══════════════════════════════════════════
   display.setFont(&FreeSansBold9pt7b);
   display.setTextColor(GxEPD_RED);
-  display.setCursor(6, 64);
+  display.setCursor(6, 58);
   display.print("TEMPERATURE");
-  
 
   display.setFont(&FreeSansBold24pt7b);
   display.setTextColor(GxEPD_BLACK);
-  display.setCursor(10, 112);
+  display.setCursor(10, 102);
   if (!isnan(g_temperature)) {
     display.printf("%.1f", g_temperature);
   } else {
     display.print("--.-");
   }
 
+  // °C 표시
   display.setFont(&FreeSansBold12pt7b);
   int16_t tx, ty; uint16_t tw, th;
-  display.getTextBounds("24.5", 10, 112, &tx, &ty, &tw, &th);
-  display.setCursor(10 + tw + 4, 100);
+  display.getTextBounds("24.5", 10, 102, &tx, &ty, &tw, &th);
+  display.setCursor(10 + tw + 4, 90);
   display.print("\xB0" "C");
 
+  // Min/Max (빨강)
   display.setFont(&FreeSansBold9pt7b);
   display.setTextColor(GxEPD_RED);
-  display.setCursor(6, 134);
+  display.setCursor(6, 124);
   if (rtcMinTemp < 900.0f && rtcMaxTemp > -900.0f) {
     display.printf("%.1f~%.1f\xB0" "C", rtcMinTemp, rtcMaxTemp);
   } else {
     display.print("---");
   }
 
-  drawHLine(0, 150, W, 1);
+  // 체감온도 (노랑)
+  float heatIdx = calcHeatIndex(g_temperature, g_humidity);
+  display.setTextColor(GxEPD_YELLOW);
+  display.setCursor(6, 146);
+  if (!isnan(heatIdx) && fabsf(heatIdx - g_temperature) > 0.5f) {
+    display.printf("Feels %.1f\xB0" "C", heatIdx);
+  } else if (!isnan(g_temperature)) {
+    display.print("Feels OK");
+  }
 
-  // ── Humidity Section ──
+  drawHLine(0, 158, W, 1);
+
+  // ══════════════════════════════════════════
+  //  Humidity Section (y: 158 ~ 290)
+  // ══════════════════════════════════════════
   display.setFont(&FreeSansBold9pt7b);
   display.setTextColor(GxEPD_BLACK);
-  display.setCursor(6, 172);
+  display.setCursor(6, 180);
   display.print("HUMIDITY");
 
   display.setFont(&FreeSansBold24pt7b);
-  display.setCursor(10, 220);
+  display.setCursor(10, 224);
   if (!isnan(g_humidity)) {
     display.printf("%.1f%%", g_humidity);
   } else {
     display.print("--.-%");
   }
 
+  // Min/Max
   display.setFont(&FreeSansBold9pt7b);
   display.setTextColor(GxEPD_BLACK);
-  display.setCursor(6, 242);
+  display.setCursor(6, 246);
   if (rtcMinHum < 900.0f && rtcMaxHum > -900.0f) {
     display.printf("%.1f~%.1f%%", rtcMinHum, rtcMaxHum);
   } else {
     display.print("---");
   }
 
-  // ── Bottom Info Section ──
-  drawHLine(0, 258, W, 2);
-
-  display.setFont(&FreeSansBold9pt7b);
-  display.setTextColor(GxEPD_BLACK);
-
-  display.setCursor(6, 280);
-  if (g_rtc_ok) {
-    display.printf("%02d-%02d %02d:%02d",
-      g_rtcNow.month, g_rtcNow.day, g_rtcNow.hour, g_rtcNow.minute);
-  } else {
-    display.print("RTC:FAIL");
-  }
-
-  display.setCursor(6, 302);
-  display.printf("SHT:%s Log:%s",
-    g_sht4_ok ? "OK" : "X",
-    g_logger_ok ? "OK" : "X");
-
-  display.setCursor(6, 324);
-  display.printf("#%lu %dmin ~%dd",
-    bootCount, SLEEP_INTERVAL_MIN, estimateBatteryDays());
-}
-
-
-/*void drawLayout() {
-  // ── Title ──
-  display.setFont(&FreeSansBold12pt7b);
-  display.setTextColor(GxEPD_BLACK);
-  display.setCursor(4, 18);
-  display.print("Home Climate");
-
-  drawHLine(0, 24, 128, 2);
-
-  // ── Temperature Section ──
-  display.setFont(&FreeSansBold9pt7b);
-  display.setTextColor(GxEPD_RED);
-  display.setCursor(4, 44);
-  display.print("TEMPERATURE");
-
-  display.setFont(&FreeSansBold24pt7b);
-  display.setTextColor(GxEPD_BLACK);
-  display.setCursor(8, 82);
-  if (!isnan(g_temperature)) {
-    display.printf("%.1f", g_temperature);
-  } else {
-    display.print("--.-");
-  }
-
-  display.setFont(&FreeSansBold12pt7b);
-  int16_t tx, ty; uint16_t tw, th;
-  display.getTextBounds("24.5", 8, 82, &tx, &ty, &tw, &th);
-  display.setCursor(8 + tw + 2, 72);
-  display.print("\xB0" "C");
-
-  display.setFont(&FreeSansBold9pt7b);
-  display.setTextColor(GxEPD_RED);
-  display.setCursor(4, 100);
-  if (rtcMinTemp < 900.0f && rtcMaxTemp > -900.0f) {
-    display.printf("%.1f~%.1f\xB0" "C", rtcMinTemp, rtcMaxTemp);
-  } else {
-    display.print("---");
-  }
-
-  drawHLine(0, 112, 128, 1);
-
-  // ── Humidity Section ──
-  display.setFont(&FreeSansBold9pt7b);
-  display.setTextColor(GxEPD_BLACK);
-  display.setCursor(4, 130);
-  display.print("HUMIDITY");
-
-  display.setFont(&FreeSansBold24pt7b);
-  display.setCursor(8, 168);
+  // 습도 상태 (노랑)
+  display.setTextColor(GxEPD_YELLOW);
+  display.setCursor(6, 268);
   if (!isnan(g_humidity)) {
-    display.printf("%.1f%%", g_humidity);
-  } else {
-    display.print("--.-%");
+    if (g_humidity < 30.0f)      display.print("Too Dry");
+    else if (g_humidity > 70.0f) display.print("Too Humid");
+    else                         display.print("Comfortable");
   }
 
-  display.setFont(&FreeSansBold9pt7b);
-  display.setTextColor(GxEPD_BLACK);
-  display.setCursor(4, 186);
-  if (rtcMinHum < 900.0f && rtcMaxHum > -900.0f) {
-    display.printf("%.1f~%.1f%%", rtcMinHum, rtcMaxHum);
-  } else {
-    display.print("---");
-  }
+  drawHLine(0, 280, W, 2);
 
-  // ── Bottom Info Section ──
-  drawHLine(0, 200, 128, 2);
-
+  // ══════════════════════════════════════════
+  //  Bottom Info Section (y: 280 ~ 384)
+  // ══════════════════════════════════════════
   display.setFont(&FreeSansBold9pt7b);
   display.setTextColor(GxEPD_BLACK);
 
-  display.setCursor(4, 216);
+  // 날짜/시간
+  display.setCursor(6, 300);
   if (g_rtc_ok) {
-    display.printf("%02d-%02d %02d:%02d",
-      g_rtcNow.month, g_rtcNow.day, g_rtcNow.hour, g_rtcNow.minute);
+    display.printf("%04d-%02d-%02d %02d:%02d",
+      g_rtcNow.year, g_rtcNow.month, g_rtcNow.day,
+      g_rtcNow.hour, g_rtcNow.minute);
   } else {
     display.print("RTC:FAIL");
   }
 
-  display.setCursor(4, 232);
+  // 센서/로거 상태
+  display.setCursor(6, 318);
   display.printf("SHT:%s Log:%s",
     g_sht4_ok ? "OK" : "X",
     g_logger_ok ? "OK" : "X");
 
-  display.setCursor(4, 248);
+  // 부트카운트 / 배터리 추정
+  display.setCursor(6, 336);
   display.printf("#%lu %dmin ~%dd",
     bootCount, SLEEP_INTERVAL_MIN, estimateBatteryDays());
+
+  // WiFi 상태 (노랑)
+  display.setTextColor(GxEPD_YELLOW);
+  display.setCursor(6, 356);
+  if (g_wifi_ok) {
+    display.print("WiFi:Synced");
+  } else {
+    display.print("WiFi:Off");
+  }
+
+  // 보드명 (노랑, 맨 아래)
+  display.setCursor(6, 376);
+  display.print(BOARD_NAME);
 }
-*/
+
 // ===================== UTILITY FUNCTIONS =====================
 int estimateBatteryDays() {
   const float I_SLEEP_MA   = 0.015f;
