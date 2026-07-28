@@ -79,8 +79,8 @@
 #define TIMEZONE_OFFSET_HR       9       // KST = UTC+9
 
 // WiFi credentials
-#define WIFI_SSID                "darmi"
-#define WIFI_PASSWORD            "rkdmf800412"
+#define WIFI_SSID                "ssid"
+#define WIFI_PASSWORD            "password"
 
 // ===================== PIN DEFINITIONS =====================
 // ┌─────────────────────────────────────────────────────────────────────┐
