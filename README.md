@@ -10,7 +10,7 @@ XIAO ESP32C6 / nanoESP32-C6 + SHT40 + 2.9" E-Paper + DS3231 (내장 플래시 Li
 |------|------|
 | MCU | Seeed XIAO ESP32C6 (4MB) 또는 nanoESP32-C6 (**16MB**) (ESP32-C6, 160MHz, 512KB SRAM) |
 | 온습도 센서 | Sensirion SHT40 (I2C, ±0.2°C, ±1.8% RH) |
-| 디스플레이 | WeAct 2.9" Black-White-Red E-Paper (SPI, SSD1680, 128×296) |
+| 디스플레이 | WeAct 2.9" 4-Color E-Paper (SPI, JD79667, **168×384**, Black/White/Red/Yellow) |
 | 데이터 저장 | **내장 플래시 LittleFS** (4MB: ~1.5MB / **16MB: ~12.8MB**) |
 | RTC | DS3231 (I2C, ±2ppm, 내장 온도센서) |
 | 배터리 | 10000mAh 리튬폴리머 |
@@ -330,10 +330,10 @@ timestamp,temperature_c,humidity_pct
 
 ```
 ┌──────────────────────┐
-│  Home Climate        │
+│  🏠 Home Climate     │
 │══════════════════════│
 │                      │
-│  TEMPERATURE (빨강)  │
+│  TEMPERATURE  (빨강) │
 │                      │
 │    24.5°C            │
 │                      │
@@ -341,18 +341,24 @@ timestamp,temperature_c,humidity_pct
 │                      │
 │──────────────────────│
 │                      │
-│  HUMIDITY            │
+│  HUMIDITY    (노랑) │
 │                      │
 │    45.2%             │
 │                      │
-│  40.0~55.2%          │
+│  40.0~55.2%  (노랑) │
 │                      │
 │══════════════════════│
-│  06-30 07:23         │
-│  SHT:OK  Log:OK      │
-│  #42  5min  ~154d    │
+│                      │
+│  🌡 체감 26.3°C(노랑)│
+│  💧 쾌적     (노랑) │
+│                      │
+│──────────────────────│
+│  07-28 11:46         │
+│  SHT:OK WiFi:OFF     │
+│  nanoESP32 #1 5min   │
 └──────────────────────┘
-   128 × 296 (세로)
+   168 × 384 (세로)
+   4색: Black / White / Red / Yellow
 ```
 
 ---
@@ -360,7 +366,7 @@ timestamp,temperature_c,humidity_pct
 ## 🐛 디버그 모드
 
 현재 코드는 **Deep Sleep이 비활성화**된 디버그 모드입니다.
-- 보드가 꺼지지 않고 `loop()`에서 10초마다 재측정
+- 보드가 꺼지지 않고 `loop()`에서 5분마다 재측정
 - 시리얼 모니터(115200 baud)에서 실시간 로그 확인 가능
 
 ### 디버그 로그 예시
@@ -379,7 +385,7 @@ timestamp,temperature_c,humidity_pct
 [DataLogger] LittleFS mounted. Records: 0
 [SETUP] Step 3: SPI + E-Paper...
 [SPI]  SCK=GPIO5, MOSI=GPIO4, CS=GPIO6
-[EPD] 2.9" BWR initialized (portrait 128x296).
+[EPD] 2.9" 4-color (168x384) initialized.
 [SETUP] Step 5: Button GPIO8=released, wokeByButton=no
 [SETUP] → Starting WiFi & Web server...
 ```
@@ -406,7 +412,7 @@ esp_deep_sleep_start();
 
 4. **WiFi 자격증명**: `WIFI_SSID`와 `WIFI_PASSWORD`를 반드시 수정하세요.
 
-5. **3색 E-Paper**: 빨간색 업데이트는 흑백보다 시간이 오래 걸립니다 (~15초). 정상 동작입니다.
+5. **4색 E-Paper**: 빨간색/노란색 업데이트는 흑백보다 시간이 오래 걸립니다 (~15초). 정상 동작입니다.
 
 6. **Deep Sleep**: ESP32C6의 Deep Sleep은 완전한 리셋으로 복귀합니다. `setup()`이 매번 실행되며, `RTC_DATA_ATTR` 변수만 유지됩니다.
 
@@ -424,7 +430,7 @@ esp_deep_sleep_start();
 
 | 부품 | 수량 | 비고 |
 |------|------|------|
-| WeAct 2.9" BWR E-Paper | 1 | SSD1680, 128×296 |
+| WeAct 2.9" 4-Color E-Paper | 1 | JD79667, 168×384, BWRY |
 | Sensirion SHT40 | 1 | I2C 온습도 센서 |
 | DS3231 RTC 모듈 | 1 | I2C, ±2ppm |
 | CR2032 코인셀 | 1 | DS3231 백업 (옵션) |
@@ -453,6 +459,7 @@ esp_deep_sleep_start();
 
 | 날짜 | 내용 |
 |------|------|
+| 2026-07-28 | 4색(BWRY) 활용, 168×384 전체 해상도 사용, 체감온도/습도상태/WiFi상태/보드명 추가, 주석 코드 삭제 |
 | 2026-07-27 | E-Paper 핀맵 수정 — Calendar 작동 코드 기준 반영 (CS=6, DC=7, RST=0, BUSY=1, SCK=5), SPI.begin() CS 핀 추가, reset_ms 50→5 |
 | 2026-07-21 | .ino 파일 2개 → 1개 통합 (`#ifdef`로 보드 선택), `HomeTempMonitor_nano.ino` 삭제, `.gitignore` 추가 |
 | 2026-07-21 | nanoESP32-C6 16MB Flash 커스텀 파티션 테이블 추가, 저장 용량 비교 정리 |
